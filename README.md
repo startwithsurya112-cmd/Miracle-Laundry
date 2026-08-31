@@ -1,114 +1,179 @@
-# 🧺 IntelligentLaundry - Laundry Shop Management System
+# 🧺 Miracle Laundry - Multi-Branch Laundry & POS Management System
 
-A modern, production-ready, **Mobile-First** Laundry Shop Management Web Application designed for small laundry & dry cleaning business owners to streamline daily shop operations, order tracking, payment recording, customer history, and digital/printable receipts with QR codes.
+A modern, production-ready, **Multi-Branch & Mobile-First** Laundry & Dry Cleaning Management System. Designed for laundry shop owners and chain businesses to manage multiple stores, counter POS billing, staff attendance, machine cycle logs, expense accounting, digital receipts with QR codes, automated WhatsApp sharing, and multi-tenant store isolation.
 
 ---
 
 ## 🌟 Key Features
 
-### 📱 Mobile-First POS & Responsive Design
-* **Touch-Optimized Bottom Navigation Bar**: Quick 1-tap navigation between Dashboard, POS Order Builder, Orders, Customers, Services, and Reports on mobile devices.
-* **Responsive Data Layout**: Automatic transformation between desktop data tables and touch-friendly mobile cards.
-* **Express POS Builder**: Fast multi-step order builder with category tabs (Clothes, Dry Clean, Household, Footwear) and `+` / `-` touch steppers.
+### 🏢 Multi-Branch & Store Tenant Management
+* **Super Admin (Owner)**: Central control with full access across all regional branches, global consolidated financial analytics, and one-click store switching.
+* **Store-Isolated Branch Admins**: Branch managers log in to their assigned store with strict data isolation (`orders`, `customers`, `expenses`, `staff`, `machines`, and `reports` for their branch only).
+* **Branch Switcher**: Interactive switcher in the navbar allowing Super Admin to switch branch context instantly without logging out.
+* **Role & User Management (`/users`)**: Create and manage branch managers and staff with granular permissions and branch assignments.
 
-### 🔐 Single Admin Authentication
-* **JWT Authentication**: Protected API routes with `bcryptjs` password hashing.
-* **Remember Me**: 30-day extended login token option.
-* **Default Admin Credentials**:
-  - **Username**: `admin`
-  - **Password**: `admin123`
+### 📱 Express POS & Touch Order Builder
+* **Category & Garment Tabs**: Fast POS order builder (Clothes, Dry Cleaning, Household, Footwear).
+* **Step-by-Step Workflow**: Order status management: `Received` → `Washing` → `Drying` → `Ironing` → `Packing` → `Ready for Delivery` → `Delivered`.
+* **Payments & Balances**: Record full, advance, and partial payments (`Cash`, `UPI`, `Card`) with auto-calculated outstanding balances.
 
-### 📊 Dashboard & Analytics
-* **8 Live Key Metrics**: Today's Orders, Pending Orders, In Progress, Ready for Pickup, Delivered Orders, Today's Revenue, Monthly Revenue, Total Customers.
-* **Interactive Revenue Charts**: Recharts daily revenue trends & service breakdown pie charts.
-* **Pending Delivery Reminders Bar**: Highlighting due/overdue orders with 1-click status bump buttons.
+### 🧾 Digital Invoices, QR Codes & WhatsApp
+* **Thermal & A4 Receipts**: Printable receipts formatted for standard printers and 80mm thermal receipt printers.
+* **Dynamic QR Verification**: Dynamic verification and UPI QR codes embedded directly onto invoices.
+* **Instant WhatsApp Sharing**: 1-tap customer invoice sharing via WhatsApp Web & mobile link.
 
-### 🧾 Receipts, Invoices & QR Codes
-* **Digital & Printable Invoices**: Thermal receipt layout & standard A4 receipt layout.
-* **Dynamic QR Code**: Verification QR code containing order details on every invoice.
-* **PDF Export & WhatsApp Sharing**: Instant PDF download & 1-tap WhatsApp receipt sending.
-
-### 💳 Order & Payment Management
-* **Order Status Workflow**: `Received` → `Washing` → `Drying` → `Ironing` → `Packing` → `Ready for Pickup` → `Delivered` (or `Cancelled`).
-* **Payment Tracking**: Record advance payments, partial payments, and full payments (`Cash`, `UPI`, `Card`). Auto-calculated remaining balance.
-
-### 📊 Reports & CSV Export
-* **Business Reports**: Daily/Weekly/Monthly revenue, top spending customers ranking, and service breakdown.
-* **CSV Export**: 1-click download of orders and customers data in CSV format.
+### ⚙️ Operational Modules
+* **Staff Attendance & Payroll (`/staff`)**: Daily register, clock-in/out tracking, overtime calculation, and ironing productivity logs.
+* **Machine & LPG Cylinder Analytics (`/machines`)**: Washer extractor and dryer cycle logging, commercial LPG cylinder longevity tracking.
+* **Accounts & Expense Vouchers (`/accounts`)**: Petty cash and bank expense recording with voucher generation and monthly profit & loss statements.
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons, Recharts, QRCode React, jsPDF, html2canvas.
-* **Backend**: Node.js, Express.js, TypeScript, Mongoose ODM, JWT, bcryptjs, QRCode.
-* **Database**: MongoDB Atlas / Local MongoDB (with offline mock demo fallback support).
+* **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons, Recharts, PWA support.
+* **Backend**: Node.js, Express.js, TypeScript, Mongoose ODM, JWT, bcryptjs, PDFKit, QRCode.
+* **Database**: MongoDB Atlas (Cloud) or Local MongoDB.
 
 ---
 
-## 🚀 Quick Start Guide
+## 🔑 Default Credentials
 
-### Prerequisites
-* Node.js (v18+)
-* npm (v9+)
-* MongoDB (Local instance or MongoDB Atlas connection string)
+* **Super Admin Username**: `adminIL`
+* **Super Admin Password**: `IL@112`
+* **Branch Admins**: Created and assigned to specific branches via the **Admins & Roles** (`/users`) page.
 
-### 1. Run Backend Server
+---
+
+## 💻 Local Development Setup
+
+### 1. Prerequisites
+* **Node.js**: v18 or higher
+* **npm**: v9 or higher
+* **MongoDB**: Local MongoDB instance or free MongoDB Atlas cluster
+
+### 2. Backend Setup
 ```bash
 cd backend
 npm install
-npm run seed  # Seed initial admin, services, clothing items, and settings
-npm run dev   # Starts API server on http://localhost:5000
+npm run seed     # Automatically creates the main branch and seeds the super admin account
+npm run dev      # Starts the backend server on http://localhost:5000
 ```
 
-### 2. Run Frontend Web App
+### 3. Frontend Setup
 ```bash
 cd frontend
 npm install
-npm run dev   # Starts Vite dev server on http://localhost:3000
-```
-
-Open `http://localhost:3000` in your browser or mobile phone browser and sign in with:
-* **Username**: `admin`
-* **Password**: `admin123`
-
----
-
-## 🐳 Docker Support
-
-Run the entire full-stack application and MongoDB database using Docker Compose:
-```bash
-docker-compose up --build
+npm run dev      # Starts the Vite dev server on http://localhost:5173
 ```
 
 ---
 
-## 📂 Project Architecture
+## 🌐 Step-by-Step Deployment Guide on Render
+
+You can host both the Backend API and the Frontend Single Page Application on [Render](https://render.com) using free/starter tiers.
+
+---
+
+### Step 1: Set up MongoDB Atlas (Cloud Database)
+1. Go to [MongoDB Atlas](https://www.mongodb.com/atlas/database) and sign in.
+2. Create a free **M0 Cluster**.
+3. Under **Security → Network Access**, click **Add IP Address** and select **Allow Access from Anywhere (`0.0.0.0/0`)**.
+4. Under **Security → Database Access**, create a database user (e.g. `laundry_admin`) with a secure password.
+5. Click **Connect → Drivers** and copy the connection string. It will look like:
+   ```
+   mongodb+srv://laundry_admin:<password>@cluster0.xxxxx.mongodb.net/miraclelaundry?retryWrites=true&w=majority
+   ```
+
+---
+
+### Step 2: Deploy Backend as a Render Web Service
+1. Log in to [Render Dashboard](https://dashboard.render.com/) and click **New + → Web Service**.
+2. Connect your GitHub repository: `https://github.com/startwithsurya112-cmd/Miracle-Laundry.git`.
+3. Configure the service settings:
+   * **Name**: `miracle-laundry-backend` (or your preferred name)
+   * **Region**: Choose the region closest to you (e.g., *Singapore* or *Frankfurt*)
+   * **Branch**: `main`
+   * **Root Directory**: `backend`
+   * **Runtime**: `Node`
+   * **Build Command**:
+     ```bash
+     npm install && npm run build
+     ```
+   * **Start Command**:
+     ```bash
+     npm start
+     ```
+4. Scroll down to **Environment Variables** and add:
+   | Key | Value |
+   |---|---|
+   | `NODE_ENV` | `production` |
+   | `PORT` | `5000` |
+   | `MONGODB_URI` | *Your MongoDB Atlas connection string from Step 1* |
+   | `JWT_SECRET` | `miracle_laundry_super_secure_jwt_secret_key_2026` |
+5. Click **Create Web Service**.
+6. Once deployed, copy your backend URL (e.g., `https://miracle-laundry-backend.onrender.com`).
+
+---
+
+### Step 3: Deploy Frontend as a Render Static Site
+1. In your Render Dashboard, click **New + → Static Site**.
+2. Select the same GitHub repository: `https://github.com/startwithsurya112-cmd/Miracle-Laundry.git`.
+3. Configure the static site settings:
+   * **Name**: `miracle-laundry-pos`
+   * **Branch**: `main`
+   * **Root Directory**: `frontend`
+   * **Build Command**:
+     ```bash
+     npm install && npm run build
+     ```
+   * **Publish Directory**: `dist`
+4. Add Environment Variable:
+   | Key | Value |
+   |---|---|
+   | `VITE_API_URL` | `https://miracle-laundry-backend.onrender.com/api` *(replace with your actual backend URL from Step 2)* |
+5. **Configure SPA Client-Side Routing (Important)**:
+   * Under your Static Site settings on Render, go to **Redirects / Rewrites**.
+   * Add a rewrite rule so React Router page refreshes work properly:
+     * **Source**: `/*`
+     * **Destination**: `/index.html`
+     * **Action**: `Rewrite`
+6. Click **Create Static Site**.
+
+---
+
+## 📁 Repository Directory Structure
 
 ```
-Laundry-shop/
+MiracleLaundry/
 ├── backend/
 │   ├── src/
-│   │   ├── config/      # DB connection & JWT config
-│   │   ├── controllers/ # Auth, Customer, Service, Item, Order, Payment, Report, Setting
-│   │   ├── middleware/  # JWT Auth & Error handling
-│   │   ├── models/      # Mongoose schemas (Admin, Customer, Service, LaundryItem, Order, Payment, Setting)
-│   │   ├── routes/      # Express API routes
-│   │   ├── utils/       # Order number & QR generators
-│   │   ├── seed.ts      # Database initial seeder
-│   │   └── index.ts     # Main Express application
+│   │   ├── config/          # MongoDB connection & configurations
+│   │   ├── controllers/     # Multi-shop, Auth, Order, Customer, Staff, Machine, Expense controllers
+│   │   ├── middleware/      # JWT Authentication & Multi-tenant Shop isolation guard
+│   │   ├── models/          # Mongoose Schemas (Shop, Admin, Order, Customer, Staff, etc.)
+│   │   ├── routes/          # Express API routes
+│   │   ├── services/        # WhatsApp gateway integration
+│   │   ├── utils/           # PDF & receipt generation utilities
+│   │   ├── seed.ts          # Default branch & Super Admin seeder
+│   │   └── index.ts         # Main Express entry point
+│   ├── .env.example
 │   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── components/  # Layout (Sidebar, Header, BottomNav), UI Badges, InvoiceView, OrderDetailModal
-│   │   ├── context/     # AuthContext & ThemeContext
-│   │   ├── pages/       # Login, Dashboard, Orders, CreateOrder, Customers, Services, Items, Reports, Settings
-│   │   ├── services/    # API client with offline demo fallback
-│   │   ├── types/       # TypeScript interfaces
-│   │   ├── App.tsx
+│   │   ├── components/      # Layout (Sidebar, Header with Branch Switcher, BottomNav), Invoices, POS UI
+│   │   ├── context/         # AuthContext (Multi-branch state), ThemeContext, ToastContext
+│   │   ├── pages/           # ShopsPage (/shops), UsersPage (/users), Dashboard, Orders, Staff, etc.
+│   │   ├── services/        # API client with X-Shop-Id header isolation
+│   │   ├── types/           # TypeScript interfaces (Shop, UserAccount, Order, etc.)
+│   │   ├── App.tsx          # Application routing
 │   │   └── main.tsx
+│   ├── .env.example
 │   └── package.json
-├── Dockerfile
-├── docker-compose.yml
 └── README.md
 ```
+
+---
+
+## 📄 License
+This project is proprietary and customized for **Miracle Laundry**. All rights reserved.
