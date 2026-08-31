@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   fetchDashboardStats,
   fetchSettings,
@@ -40,14 +41,19 @@ import {
   UserCheck,
   ChevronLeft,
   ChevronRight,
+  Building2,
+  Globe,
+  MapPin,
 } from 'lucide-react';
 
 type CardType = 'orders' | 'payments' | 'active' | 'customers' | 'overdue' | 'delivered_orders' | 'delivered_revenue';
 
 export const DashboardPage: React.FC = () => {
+  const { isSuperAdmin, selectedShop, selectedShopId } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [setting, setSetting] = useState<Setting | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+
 
   // Selected Active Metric Card (Default: 'orders')
   const [activeCard, setActiveCard] = useState<CardType>('orders');
@@ -137,7 +143,7 @@ export const DashboardPage: React.FC = () => {
   useEffect(() => {
     loadData();
     setDashPage(1);
-  }, [preset, paymentStatus, orderStatus, dateType, dateFrom, dateTo, activeCard]);
+  }, [preset, paymentStatus, orderStatus, dateType, dateFrom, dateTo, activeCard, selectedShopId]);
 
   const currencySymbol = setting?.currencySymbol || '₹';
 
@@ -208,10 +214,9 @@ export const DashboardPage: React.FC = () => {
   // Active Category List & Pagination math
   const processedCustomersList = newCustomersList.map((c) => {
     const custOrders = ordersList.filter(
-      (o: any) =>
-        (o.customerId && String(o.customerId) === String(c._id)) ||
-        (o.customer && String(typeof o.customer === 'object' ? o.customer._id : o.customer) === String(c._id)) ||
-        (o.customerSnapshot && o.customerSnapshot.mobile === c.mobile)
+      (o) =>
+        (typeof o.customer === 'object' ? (o.customer as any)?._id : o.customer) === c._id ||
+        o.customerSnapshot?.mobile === c.mobile
     );
     return {
       ...c,
@@ -237,6 +242,37 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6 pb-12">
+      {/* Branch Context Indicator Banner */}
+      {isSuperAdmin && (
+        <div className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-50 via-white to-brand-50 dark:from-indigo-950/40 dark:via-slate-900 dark:to-brand-950/40 border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            {selectedShop ? (
+              <>
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  Branch Context: <strong className="text-indigo-600 dark:text-indigo-400">[{selectedShop.code}] {selectedShop.name}</strong> ({selectedShop.region})
+                </span>
+              </>
+            ) : (
+              <>
+                <Globe className="w-4 h-4 text-indigo-500" />
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  Global Overview: <strong className="text-indigo-600 dark:text-indigo-400">All Branches Consolidated</strong>
+                </span>
+              </>
+            )}
+          </div>
+
+          <button
+            onClick={() => navigate('/shops')}
+            className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 shrink-0"
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Manage Branches</span>
+          </button>
+        </div>
+      )}
+
       {/* Header Banner & Quick Action Buttons (Hidden on Desktop, Visible on Mobile) */}
       <div className="md:hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 bg-gradient-to-r from-brand-600 to-cyan-600 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 text-white shadow-lg shadow-brand-600/20">
         <div>

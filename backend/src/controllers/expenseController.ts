@@ -2,10 +2,11 @@ import { Request, Response } from 'express';
 import Expense from '../models/Expense';
 import Payment from '../models/Payment';
 import Order from '../models/Order';
+import { AuthRequest } from '../middleware/auth';
 import { generateVoucherNumber } from '../utils/voucherNumberGenerator';
 
 // --- Shop Expenses Endpoints ---
-export const getExpenses = async (req: Request, res: Response) => {
+export const getExpenses = async (req: AuthRequest, res: Response) => {
   try {
     const { category, paymentMethod, search, dateFrom, dateTo, page = 1, limit = 20 } = req.query;
 
@@ -14,6 +15,9 @@ export const getExpenses = async (req: Request, res: Response) => {
     const skip = (pageNum - 1) * limitNum;
 
     let query: any = {};
+    if (req.targetShopId) {
+      query.shopId = req.targetShopId;
+    }
 
     if (category) query.category = category;
     if (paymentMethod) query.paymentMethod = paymentMethod;
@@ -66,9 +70,9 @@ export const getExpenses = async (req: Request, res: Response) => {
   }
 };
 
-export const createExpense = async (req: Request, res: Response) => {
+export const createExpense = async (req: AuthRequest, res: Response) => {
   try {
-    const { category, description, amount, paymentMethod, paidTo, expenseDate, notes } = req.body;
+    const { category, description, amount, paymentMethod, paidTo, expenseDate, notes, shopId } = req.body;
 
     if (!category || !description || amount === undefined) {
       return res.status(400).json({ success: false, message: 'Category, description, and valid amount are required' });
@@ -82,6 +86,7 @@ export const createExpense = async (req: Request, res: Response) => {
     const voucherNumber = await generateVoucherNumber();
 
     const expense = new Expense({
+      shopId: req.targetShopId || shopId || null,
       voucherNumber,
       category,
       description,
@@ -104,9 +109,9 @@ export const createExpense = async (req: Request, res: Response) => {
   }
 };
 
-export const updateExpense = async (req: Request, res: Response) => {
+export const updateExpense = async (req: AuthRequest, res: Response) => {
   try {
-    const { category, description, amount, paymentMethod, paidTo, expenseDate, notes } = req.body;
+    const { category, description, amount, paymentMethod, paidTo, expenseDate, notes, shopId } = req.body;
 
     const expense = await Expense.findById(req.params.id);
     if (!expense) {
@@ -120,6 +125,7 @@ export const updateExpense = async (req: Request, res: Response) => {
     if (paidTo !== undefined) expense.paidTo = paidTo;
     if (expenseDate) expense.expenseDate = new Date(expenseDate);
     if (notes !== undefined) expense.notes = notes;
+    if (shopId !== undefined) expense.shopId = shopId;
 
     await expense.save();
 
@@ -133,7 +139,7 @@ export const updateExpense = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteExpense = async (req: Request, res: Response) => {
+export const deleteExpense = async (req: AuthRequest, res: Response) => {
   try {
     const expense = await Expense.findById(req.params.id);
     if (!expense) {
@@ -152,13 +158,19 @@ export const deleteExpense = async (req: Request, res: Response) => {
 };
 
 // --- Combined Order & Accounts Summary Endpoint ---
-export const getAccountsSummary = async (req: Request, res: Response) => {
+export const getAccountsSummary = async (req: AuthRequest, res: Response) => {
   try {
     const { dateFrom, dateTo, paymentMethod } = req.query;
 
     let paymentQuery: any = {};
     let orderQuery: any = {};
     let expenseQuery: any = {};
+
+    if (req.targetShopId) {
+      paymentQuery.shopId = req.targetShopId;
+      orderQuery.shopId = req.targetShopId;
+      expenseQuery.shopId = req.targetShopId;
+    }
 
     if (dateFrom || dateTo) {
       paymentQuery.paidAt = {};
@@ -272,3 +284,4 @@ export const getAccountsSummary = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+

@@ -21,6 +21,8 @@ import backupRoutes from './routes/backupRoutes';
 import whatsappRoutes from './routes/whatsappRoutes';
 import staffRoutes from './routes/staffRoutes';
 import machineRoutes from './routes/machineRoutes';
+import shopRoutes from './routes/shopRoutes';
+import userRoutes from './routes/userRoutes';
 import { initWhatsAppGateway } from './services/whatsappGateway';
 
 dotenv.config();
@@ -33,7 +35,7 @@ app.use(compression());
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'X-Requested-With', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'X-Requested-With', 'Accept', 'X-Shop-Id'],
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -63,6 +65,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/shops', shopRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/items', itemRoutes);

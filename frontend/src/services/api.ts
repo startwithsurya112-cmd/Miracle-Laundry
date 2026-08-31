@@ -10,6 +10,8 @@ import {
   Expense,
   AccountsSummary,
   AccountsTransaction,
+  Shop,
+  UserAccount,
 } from '../types';
 import { posGroupCatalog } from '../data/posCatalogData';
 
@@ -30,6 +32,17 @@ export const getAuthToken = () => localStorage.getItem('auth_token');
 export const setAuthToken = (token: string) => localStorage.setItem('auth_token', token);
 export const removeAuthToken = () => localStorage.removeItem('auth_token');
 
+// Shop isolation selector helpers
+export const getSelectedShopId = () => localStorage.getItem('selected_shop_id');
+export const setSelectedShopId = (id: string | null) => {
+  if (id && id !== 'all') {
+    localStorage.setItem('selected_shop_id', id);
+  } else {
+    localStorage.removeItem('selected_shop_id');
+  }
+  clearApiCache();
+};
+
 // In-Memory API Response Cache for instant 0ms loads
 const apiMemoryCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -48,11 +61,14 @@ export const peekApiCache = (endpoint: string) => {
 
 const fetchApiNetwork = async (endpoint: string, options: RequestInit = {}, retries = 1): Promise<any> => {
   const token = getAuthToken();
+  const selectedShopId = getSelectedShopId();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(selectedShopId ? { 'X-Shop-Id': selectedShopId } : {}),
     ...(options.headers || {}),
   };
+
 
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -1603,6 +1619,100 @@ export const fetchMachineUtilityAnalyticsApi = async (params: any = {}) => {
 };
 
 // ==========================================
+// MULTI-BRANCH & SHOP MANAGEMENT APIS
+// ==========================================
+export const fetchShops = async (params: { search?: string; region?: string; activeOnly?: boolean } = {}): Promise<{ success: boolean; shops: Shop[]; total: number }> => {
+  const cleanParams: any = {};
+  if (params.search) cleanParams.search = params.search;
+  if (params.region) cleanParams.region = params.region;
+  if (params.activeOnly) cleanParams.activeOnly = 'true';
+  const query = new URLSearchParams(cleanParams).toString();
+  return fetchApi(`/shops?${query}`);
+};
+
+export const fetchShopById = async (id: string): Promise<{ success: boolean; shop: Shop }> => {
+  return fetchApi(`/shops/${id}`);
+};
+
+export const createShopApi = async (shopData: Partial<Shop>): Promise<{ success: boolean; shop: Shop; message: string }> => {
+  clearApiCache();
+  return fetchApi('/shops', {
+    method: 'POST',
+    body: JSON.stringify(shopData),
+  });
+};
+
+export const updateShopApi = async (id: string, shopData: Partial<Shop>): Promise<{ success: boolean; shop: Shop; message: string }> => {
+  clearApiCache();
+  return fetchApi(`/shops/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(shopData),
+  });
+};
+
+export const deleteShopApi = async (id: string, hardDelete = false): Promise<{ success: boolean; message: string }> => {
+  clearApiCache();
+  return fetchApi(`/shops/${id}?hardDelete=${hardDelete}`, {
+    method: 'DELETE',
+  });
+};
+
+export const fetchShopOverviewApi = async (): Promise<{
+  success: boolean;
+  stats: {
+    totalShops: number;
+    activeShops: number;
+    totalRevenue: number;
+    totalOrders: number;
+    deliveredOrders: number;
+    todayRevenue: number;
+    todayOrders: number;
+    monthRevenue: number;
+    monthOrders: number;
+    totalCustomers: number;
+    totalStaff: number;
+  };
+  regionalBreakdown: Array<{ region: string; revenue: number; orders: number }>;
+}> => {
+  return fetchApi('/shops/overview');
+};
+
+// ==========================================
+// USER & ROLE MANAGEMENT APIS
+// ==========================================
+export const fetchUsers = async (params: { role?: string; shopId?: string; search?: string } = {}): Promise<{ success: boolean; users: UserAccount[]; total: number }> => {
+  const cleanParams: any = {};
+  if (params.role) cleanParams.role = params.role;
+  if (params.shopId) cleanParams.shopId = params.shopId;
+  if (params.search) cleanParams.search = params.search;
+  const query = new URLSearchParams(cleanParams).toString();
+  return fetchApi(`/users?${query}`);
+};
+
+export const createUserApi = async (userData: any): Promise<{ success: boolean; user: UserAccount; message: string }> => {
+  clearApiCache();
+  return fetchApi('/users', {
+    method: 'POST',
+    body: JSON.stringify(userData),
+  });
+};
+
+export const updateUserApi = async (id: string, userData: any): Promise<{ success: boolean; user: UserAccount; message: string }> => {
+  clearApiCache();
+  return fetchApi(`/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(userData),
+  });
+};
+
+export const deleteUserApi = async (id: string): Promise<{ success: boolean; message: string }> => {
+  clearApiCache();
+  return fetchApi(`/users/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+// ==========================================
 // BACKGROUND DATA PRE-WARMING ENGINE
 // ==========================================
 let isPrewarmingDone = false;
@@ -1625,3 +1735,4 @@ export const prefetchAllAppData = async () => {
     console.error('Background pre-warming error:', err);
   }
 };
+

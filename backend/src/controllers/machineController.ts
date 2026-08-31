@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import MachineLog from '../models/MachineLog';
 import GasCylinderLog from '../models/GasCylinderLog';
+import { AuthRequest } from '../middleware/auth';
 
 // Helper to calculate start & end date based on period filter
 const calculateDateRange = (period: string, startDate?: string, endDate?: string) => {
@@ -36,10 +37,14 @@ const calculateDateRange = (period: string, startDate?: string, endDate?: string
 // -------------------------------------------------------------
 // 1. Machine Cycle Logging (Washer Extractor & Dryer)
 // -------------------------------------------------------------
-export const getMachineLogs = async (req: Request, res: Response) => {
+export const getMachineLogs = async (req: AuthRequest, res: Response) => {
   try {
     const { machineType, period = 'month', startDate, endDate } = req.query;
     let query: any = {};
+
+    if (req.targetShopId) {
+      query.shopId = req.targetShopId;
+    }
 
     if (machineType) {
       query.machineType = machineType;
@@ -55,9 +60,9 @@ export const getMachineLogs = async (req: Request, res: Response) => {
   }
 };
 
-export const logMachineCycle = async (req: Request, res: Response) => {
+export const logMachineCycle = async (req: AuthRequest, res: Response) => {
   try {
-    const { machineType, programName, durationMinutes, cyclesCount, operatorName, notes, date } = req.body;
+    const { machineType, programName, durationMinutes, cyclesCount, operatorName, notes, date, shopId } = req.body;
 
     if (!machineType || !programName) {
       return res.status(400).json({ success: false, message: 'Machine type and program name are required.' });
@@ -74,6 +79,7 @@ export const logMachineCycle = async (req: Request, res: Response) => {
     }
 
     const newLog = new MachineLog({
+      shopId: req.targetShopId || shopId || null,
       machineType,
       date: targetDate,
       programName: programName.trim(),
@@ -93,13 +99,18 @@ export const logMachineCycle = async (req: Request, res: Response) => {
 // -------------------------------------------------------------
 // 2. LPG Gas Cylinder Tracking (Dryer)
 // -------------------------------------------------------------
-export const getGasCylinderLogs = async (req: Request, res: Response) => {
+export const getGasCylinderLogs = async (req: AuthRequest, res: Response) => {
   try {
     const { period = 'month', startDate, endDate } = req.query;
     const range = calculateDateRange(period as string, startDate as string, endDate as string);
 
-    // Fetch all logs sorted ascending by changeDate to compute exact longevity interval for each cylinder
-    const allLogs = await GasCylinderLog.find().sort({ changeDate: 1 });
+    const filter: any = {};
+    if (req.targetShopId) {
+      filter.shopId = req.targetShopId;
+    }
+
+    // Fetch logs sorted ascending by changeDate to compute exact longevity interval for each cylinder
+    const allLogs = await GasCylinderLog.find(filter).sort({ changeDate: 1 });
 
     // Compute longevity days for each cylinder (the duration it ran until replaced by the next cylinder)
     for (let i = 0; i < allLogs.length; i++) {
@@ -129,9 +140,9 @@ export const getGasCylinderLogs = async (req: Request, res: Response) => {
   }
 };
 
-export const logGasCylinder = async (req: Request, res: Response) => {
+export const logGasCylinder = async (req: AuthRequest, res: Response) => {
   try {
-    const { changeDate, quantity, vendorName, cylinderSize, notes } = req.body;
+    const { changeDate, quantity, vendorName, cylinderSize, notes, shopId } = req.body;
     
     let targetDate = new Date();
     if (changeDate) {
@@ -144,6 +155,7 @@ export const logGasCylinder = async (req: Request, res: Response) => {
     }
 
     const newLog = new GasCylinderLog({
+      shopId: req.targetShopId || shopId || null,
       changeDate: targetDate,
       quantity: Number(quantity) || 1,
       daysLasted: 0,
@@ -164,7 +176,7 @@ export const logGasCylinder = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteGasCylinder = async (req: Request, res: Response) => {
+export const deleteGasCylinder = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const deleted = await GasCylinderLog.findByIdAndDelete(id);
@@ -180,13 +192,15 @@ export const deleteGasCylinder = async (req: Request, res: Response) => {
 // -------------------------------------------------------------
 // 3. Utility Performance Analytics (Washer Extractor & Dryer LPG)
 // -------------------------------------------------------------
-export const getMachineUtilityAnalytics = async (req: Request, res: Response) => {
+export const getMachineUtilityAnalytics = async (req: AuthRequest, res: Response) => {
   try {
     const { period = 'month', startDate, endDate } = req.query;
     const range = calculateDateRange(period as string, startDate as string, endDate as string);
+    const shopFilter = req.targetShopId ? { shopId: req.targetShopId } : {};
 
     // 1. Washer Extractor Logs
     const washerLogs = await MachineLog.find({
+      ...shopFilter,
       machineType: 'Washer Extractor',
       date: { $gte: range.start, $lte: range.end },
     });
@@ -206,6 +220,7 @@ export const getMachineUtilityAnalytics = async (req: Request, res: Response) =>
 
     // 2. Dryer Logs
     const dryerLogs = await MachineLog.find({
+      ...shopFilter,
       machineType: 'Dryer',
       date: { $gte: range.start, $lte: range.end },
     });
@@ -222,13 +237,14 @@ export const getMachineUtilityAnalytics = async (req: Request, res: Response) =>
 
     // 3. Gas Cylinder Replacements in period
     const cylinders = await GasCylinderLog.find({
+      ...shopFilter,
       changeDate: { $gte: range.start, $lte: range.end },
     }).sort({ changeDate: -1 });
 
     const totalCylindersUsed = cylinders.reduce((sum, c) => sum + (c.quantity || 1), 0);
 
     // Calculate Average Longevity in Days across all completed cylinders
-    const allCylinders = await GasCylinderLog.find().sort({ changeDate: 1 });
+    const allCylinders = await GasCylinderLog.find(shopFilter).sort({ changeDate: 1 });
     let totalDays = 0;
     let countedCylinders = 0;
 
@@ -263,3 +279,4 @@ export const getMachineUtilityAnalytics = async (req: Request, res: Response) =>
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+

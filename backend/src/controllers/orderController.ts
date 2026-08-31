@@ -4,6 +4,8 @@ import Order, { OrderStatus, PaymentStatus } from '../models/Order';
 import Customer from '../models/Customer';
 import Payment from '../models/Payment';
 import Setting from '../models/Setting';
+import Shop from '../models/Shop';
+import { AuthRequest } from '../middleware/auth';
 import { generateOrderNumber } from '../utils/orderNumberGenerator';
 import { generateQRCodeDataUrl } from '../utils/qrGenerator';
 import { sendAutomatedWhatsAppMessage, sendAutomatedWhatsAppDocument } from '../services/whatsappGateway';
@@ -25,14 +27,14 @@ export const getPublicOrderByNumber = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Order number is required' });
     }
 
-    let order = await Order.findOne({ orderNumber: orderNum });
+    let order = await Order.findOne({ orderNumber: orderNum }).populate('shopId');
     if (!order) {
-      order = await Order.findOne({ orderNumber: new RegExp('^' + orderNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') });
+      order = await Order.findOne({ orderNumber: new RegExp('^' + orderNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }).populate('shopId');
     }
     if (!order) {
       const digits = orderNum.replace(/\D/g, '');
       if (digits) {
-        order = await Order.findOne({ orderNumber: new RegExp(digits + '(/|$)') });
+        order = await Order.findOne({ orderNumber: new RegExp(digits + '(/|$)') }).populate('shopId');
       }
     }
 
@@ -46,7 +48,7 @@ export const getPublicOrderByNumber = async (req: Request, res: Response) => {
   }
 };
 
-export const getOrders = async (req: Request, res: Response) => {
+export const getOrders = async (req: AuthRequest, res: Response) => {
   try {
     const { status, paymentStatus, search, dateFrom, dateTo, page = 1, limit = 20 } = req.query;
 
@@ -55,6 +57,10 @@ export const getOrders = async (req: Request, res: Response) => {
     const skip = (pageNum - 1) * limitNum;
 
     let query: any = {};
+
+    if (req.targetShopId) {
+      query.shopId = req.targetShopId;
+    }
 
     if (status) {
       query.status = status;
@@ -82,6 +88,7 @@ export const getOrders = async (req: Request, res: Response) => {
     const total = await Order.countDocuments(query);
     const orders = await Order.find(query)
       .populate('customer', 'name mobile address email')
+      .populate('shopId', 'name code region phone')
       .sort({ orderDate: -1, createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
@@ -102,9 +109,13 @@ export const getOrders = async (req: Request, res: Response) => {
   }
 };
 
-export const getOrderById = async (req: Request, res: Response) => {
+export const getOrderById = async (req: AuthRequest, res: Response) => {
   try {
-    const order = await Order.findById(req.params.id).populate('customer');
+    let query: any = { _id: req.params.id };
+    if (req.targetShopId) {
+      query.shopId = req.targetShopId;
+    }
+    const order = await Order.findOne(query).populate('customer').populate('shopId');
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
@@ -117,7 +128,7 @@ export const getOrderById = async (req: Request, res: Response) => {
   }
 };
 
-export const createOrder = async (req: Request, res: Response) => {
+export const createOrder = async (req: AuthRequest, res: Response) => {
   try {
     const {
       customerId,
@@ -129,7 +140,10 @@ export const createOrder = async (req: Request, res: Response) => {
       advancePaid = 0,
       paymentMethod = 'Pending',
       notes = '',
+      shopId,
     } = req.body;
+
+    const assignedShopId = req.targetShopId || shopId || null;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'At least one laundry item is required' });
@@ -150,6 +164,7 @@ export const createOrder = async (req: Request, res: Response) => {
         customerObj = existing;
       } else {
         customerObj = new Customer({
+          shopId: assignedShopId,
           name: custData.name || 'Walk-in Customer',
           mobile: mob,
           address: custData.address || 'Local',
@@ -165,6 +180,7 @@ export const createOrder = async (req: Request, res: Response) => {
         customerObj = existing;
       } else {
         customerObj = new Customer({
+          shopId: assignedShopId,
           name: 'Walk-in Customer',
           mobile: '9876543210',
           address: 'Local Shop',
@@ -223,6 +239,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
     const order = new Order({
       orderNumber,
+      shopId: assignedShopId,
       customer: customerObj._id,
       customerSnapshot: {
         name: customerObj.name,
@@ -264,6 +281,7 @@ export const createOrder = async (req: Request, res: Response) => {
     // Record initial payment if advance paid
     if (advPaid > 0) {
       const payment = new Payment({
+        shopId: assignedShopId,
         orderId: order._id,
         orderNumber: order.orderNumber,
         customerId: customerObj._id,
@@ -275,6 +293,7 @@ export const createOrder = async (req: Request, res: Response) => {
       });
       await payment.save();
     }
+
 
     // Automated Background WhatsApp Notification on Order Creation
     if (customerObj && customerObj.mobile) {
@@ -459,6 +478,7 @@ export const recordOrderPayment = async (req: Request, res: Response) => {
     await order.save();
 
     const payment = new Payment({
+      shopId: order.shopId,
       orderId: order._id,
       orderNumber: order.orderNumber,
       customerId: order.customer,

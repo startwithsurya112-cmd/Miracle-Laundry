@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import Admin from '../models/Admin';
+import Shop from '../models/Shop';
 import { generateToken, AuthRequest } from '../middleware/auth';
 
 export const login = async (req: Request, res: Response) => {
@@ -11,9 +12,13 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Please provide both username and password' });
     }
 
-    const admin = await Admin.findOne({ username });
+    const admin = await Admin.findOne({ username }).populate('shopId');
     if (!admin) {
       return res.status(401).json({ success: false, message: 'Invalid username or password' });
+    }
+
+    if (admin.isActive === false) {
+      return res.status(403).json({ success: false, message: 'Account is deactivated. Contact the Super Admin.' });
     }
 
     const isMatch = await bcrypt.compare(password, admin.password);
@@ -21,8 +26,16 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: 'Invalid username or password' });
     }
 
+    const shopIdStr = admin.shopId ? (admin.shopId as any)._id?.toString() || admin.shopId.toString() : null;
+
     const token = generateToken(
-      { id: admin._id.toString(), username: admin.username, name: admin.name },
+      {
+        id: admin._id.toString(),
+        username: admin.username,
+        name: admin.name,
+        role: admin.role || 'super_admin',
+        shopId: shopIdStr,
+      },
       !!rememberMe
     );
 
@@ -35,6 +48,10 @@ export const login = async (req: Request, res: Response) => {
         username: admin.username,
         name: admin.name,
         email: admin.email,
+        phone: admin.phone || '',
+        role: admin.role || 'super_admin',
+        shopId: shopIdStr,
+        shop: admin.shopId || null,
       },
     });
   } catch (error: any) {
@@ -47,11 +64,23 @@ export const getMe = async (req: AuthRequest, res: Response) => {
     if (!req.user) {
       return res.status(401).json({ success: false, message: 'Not authenticated' });
     }
-    const admin = await Admin.findById(req.user.id).select('-password');
+    const admin = await Admin.findById(req.user.id).select('-password').populate('shopId');
     if (!admin) {
       return res.status(404).json({ success: false, message: 'Admin user not found' });
     }
-    res.json({ success: true, admin });
+    res.json({
+      success: true,
+      admin: {
+        id: admin._id,
+        username: admin.username,
+        name: admin.name,
+        email: admin.email,
+        phone: admin.phone || '',
+        role: admin.role || 'super_admin',
+        shopId: admin.shopId ? (admin.shopId as any)._id?.toString() || admin.shopId.toString() : null,
+        shop: admin.shopId || null,
+      },
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -59,7 +88,7 @@ export const getMe = async (req: AuthRequest, res: Response) => {
 
 export const updateProfile = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, email, currentPassword, newPassword } = req.body;
+    const { name, email, phone, currentPassword, newPassword } = req.body;
     const admin = await Admin.findById(req.user?.id);
 
     if (!admin) {
@@ -68,6 +97,7 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
 
     if (name) admin.name = name;
     if (email) admin.email = email;
+    if (phone !== undefined) admin.phone = phone;
 
     if (newPassword) {
       if (!currentPassword) {
@@ -90,9 +120,13 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
         username: admin.username,
         name: admin.name,
         email: admin.email,
+        phone: admin.phone || '',
+        role: admin.role,
+        shopId: admin.shopId,
       },
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+

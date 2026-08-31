@@ -12,15 +12,68 @@ export type OrderStatus =
 export type PaymentStatus = 'Paid' | 'Partially Paid' | 'Pending';
 export type PaymentMethod = 'Cash' | 'UPI' | 'Card' | 'Pending';
 
+export type UserRole = 'super_admin' | 'branch_admin' | 'staff';
+
+export interface ShopMetrics {
+  totalOrders: number;
+  totalRevenue: number;
+  pendingOrders: number;
+  todayOrders: number;
+  todayRevenue: number;
+  activeStaff: number;
+}
+
+export interface Shop {
+  _id: string;
+  name: string;
+  code: string;
+  region: string;
+  phone: string;
+  email: string;
+  address: string;
+  invoicePrefix: string;
+  gstNumber?: string;
+  gstPercentage: number;
+  currencySymbol: string;
+  currencyCode: string;
+  upiId?: string;
+  gpayNumber?: string;
+  paymentQrUrl?: string;
+  logoUrl?: string;
+  termsAndConditions?: string;
+  isActive: boolean;
+  metrics?: ShopMetrics;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Admin {
   id: string;
   username: string;
   name: string;
   email: string;
+  phone?: string;
+  role?: UserRole;
+  shopId?: string | null;
+  shop?: Shop | null;
+}
+
+export interface UserAccount {
+  _id: string;
+  username: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: UserRole;
+  shopId?: Shop | string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Customer {
   _id: string;
+  shopId?: string | Shop;
   name: string;
   mobile: string;
   address: string;
@@ -31,6 +84,7 @@ export interface Customer {
   createdAt: string;
   updatedAt: string;
 }
+
 
 export interface Service {
   _id: string;
@@ -83,6 +137,7 @@ export interface StatusHistory {
 export interface Order {
   _id: string;
   orderNumber: string;
+  shopId?: string | Shop;
   customer: Customer | string;
   customerSnapshot: {
     name: string;

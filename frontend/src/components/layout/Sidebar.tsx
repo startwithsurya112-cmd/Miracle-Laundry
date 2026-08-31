@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -16,6 +17,8 @@ import {
   ChevronDown,
   Wallet,
   PackageSearch,
+  Building2,
+  UserCheck,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,6 +27,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggleCollapse }) => {
+  const { isSuperAdmin } = useAuth();
   const location = useLocation();
 
   // Check if current path belongs to Catalog & Services group
@@ -46,6 +50,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggleC
     { label: 'Customers', path: '/customers', icon: Users },
   ];
 
+  const branchNavItems = [
+    { label: 'Branches & Shops', path: '/shops', icon: Building2 },
+    { label: 'Admins & Roles', path: '/users', icon: UserCheck },
+  ];
+
   const catalogNavItems = [
     { label: 'Services', path: '/services', icon: WashingMachine },
     { label: 'Clothing Items', path: '/items', icon: Shirt },
@@ -56,6 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggleC
     { label: 'Reports', path: '/reports', icon: BarChart3 },
     { label: 'Shop Settings', path: '/settings', icon: Settings },
   ];
+
 
   return (
     <aside
@@ -201,7 +211,43 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggleC
           )}
         </div>
 
-        {/* SECTION 3: REPORTS & SYSTEM */}
+        {/* SECTION 3: MULTI-BRANCH ADMIN (SUPER ADMIN ONLY) */}
+        {isSuperAdmin && (
+          <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+            {!isCollapsed && (
+              <div className="px-3 text-[10px] font-bold tracking-wider text-indigo-500 dark:text-indigo-400 uppercase mb-1.5 flex items-center justify-between">
+                <span>Multi-Branch Admin</span>
+                <span className="text-[9px] bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 px-1.5 py-0.5 rounded font-mono">
+                  HQ
+                </span>
+              </div>
+            )}
+            {branchNavItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  title={isCollapsed ? item.label : undefined}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 ${
+                      isCollapsed ? 'justify-center' : ''
+                    } ${
+                      isActive
+                        ? 'bg-gradient-to-r from-indigo-600 to-brand-600 text-white shadow-md shadow-indigo-600/30 font-bold'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`
+                  }
+                >
+                  <Icon className="w-5 h-5 shrink-0" />
+                  {!isCollapsed && <span>{item.label}</span>}
+                </NavLink>
+              );
+            })}
+          </div>
+        )}
+
+        {/* SECTION 4: REPORTS & SYSTEM */}
         <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800/80">
           {!isCollapsed && (
             <div className="px-3 text-[10px] font-bold tracking-wider text-slate-400 uppercase mb-1.5">
