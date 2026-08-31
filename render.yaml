@@ -29,4 +29,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://miracle-laundry-backend.onrender.com/api
+        value: https://miracle-laundry.onrender.com/api

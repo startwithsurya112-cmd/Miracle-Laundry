@@ -100,7 +100,7 @@ app.use((req: Request, res: Response) => {
 
 // Uptime Keep-Alive Worker (Prevents Render Free Tier from going to sleep)
 const startUptimeKeepAlive = () => {
-  const targetUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || 'https://miracle-laundry-backend.onrender.com';
+  const targetUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || 'https://miracle-laundry.onrender.com';
   if (!targetUrl || process.env.NODE_ENV === 'test') return;
 
   const healthUrl = `${targetUrl.replace(/\/$/, '')}/api/health`;
