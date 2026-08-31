@@ -17,17 +17,17 @@ import { Settings, Store, Receipt, CheckCircle, Save, Trash2, Upload, X, FileSpr
 export const SettingsPage: React.FC = () => {
   const { showToast } = useToast();
   const [setting, setSetting] = useState<Setting>({
-    shopName: 'IntelligentLaundry',
-    shopTagline: 'Smart & Premium Laundry Management',
-    logoUrl: '/Intelligent Laundry.jpg.jpeg',
+    shopName: 'Miracle Laundry',
+    shopTagline: 'Express & Premium Laundry Services',
+    logoUrl: '/logo.jpg',
     phone: '+91 98765 43210',
-    email: 'contact@intelligentlaundry.com',
+    email: 'contact@miraclelaundry.com',
     address: '123 Sparkle Avenue, Suite 4B, Commercial Hub',
     gstNumber: '27AABCU9603R1ZM',
     gstPercentage: 18,
     currencySymbol: '₹',
     currencyCode: 'INR',
-    invoicePrefix: 'ORD-',
+    invoicePrefix: 'ML-',
     termsAndConditions: 'Items not collected within 30 days are subject to storage charges.',
   });
 

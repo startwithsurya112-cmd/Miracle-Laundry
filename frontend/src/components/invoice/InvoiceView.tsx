@@ -197,17 +197,15 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, setting, onClos
                       ? setting.logoUrl
                       : "/logo.jpg"
                   }
-                  alt="IntelligentLaundry Logo"
+                  alt="Miracle Laundry Logo"
                   className="h-10 sm:h-12 w-auto object-contain rounded-xl border border-slate-200 shadow-xs"
                 />
                 <span className="text-brand-700 font-black tracking-tight">
-                  {setting?.shopName && setting.shopName !== 'IntelligentLaundry & Dry Cleaners'
-                    ? setting.shopName
-                    : 'Intelligent Laundry'}
+                  {setting?.shopName || 'Miracle Laundry'}
                 </span>
               </div>
               <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                {setting?.shopTagline || 'Smart & Premium Laundry Management'}
+                {setting?.shopTagline || 'Express & Premium Laundry Services'}
               </p>
 
               <div className="mt-2.5 text-xs text-slate-600 space-y-1">

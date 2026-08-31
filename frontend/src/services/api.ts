@@ -1258,17 +1258,17 @@ const getMockSettings = (): Setting => {
   const stored = localStorage.getItem('mock_settings');
   if (stored) return JSON.parse(stored);
   const initial: Setting = {
-    shopName: 'IntelligentLaundry',
-    shopTagline: 'Smart & Premium Laundry Management',
-    logoUrl: '/Intelligent Laundry.jpg.jpeg',
+    shopName: 'Miracle Laundry',
+    shopTagline: 'Express & Premium Laundry Services',
+    logoUrl: '/logo.jpg',
     phone: '+91 98765 43210',
-    email: 'contact@intelligentlaundry.com',
+    email: 'contact@miraclelaundry.com',
     address: '42 Commercial Street, Sector 15, Metro City, 400001',
     gstNumber: '27AABCU9603R1ZM',
     gstPercentage: 0,
     currencySymbol: '₹',
     currencyCode: 'INR',
-    invoicePrefix: 'ORD-',
+    invoicePrefix: 'ML-',
     termsAndConditions: '1. Please check garments at the time of delivery.\n2. Clothes uncollected after 30 days are subject to storage charges.',
   };
   localStorage.setItem('mock_settings', JSON.stringify(initial));

@@ -87,24 +87,31 @@ export const seedDatabase = async () => {
       ]);
     }
 
-    // 4. Seed Settings if missing
+    // 4. Seed Settings if missing or update branding
     let setting = await Setting.findOne();
     if (!setting) {
       setting = await Setting.create({
-        shopName: 'IntelligentLaundry & Dry Cleaners',
-        shopTagline: 'Smart & Premium Laundry Management',
-        logoUrl: 'https://images.unsplash.com/photo-1545173168-9f1947eebb7f?w=200&auto=format&fit=crop&q=80',
+        shopName: 'Miracle Laundry',
+        shopTagline: 'Express & Premium Laundry Services',
+        logoUrl: '/logo.jpg',
         phone: '+91 98765 43210',
-        email: 'support@intelligentlaundry.com',
-        address: '42 Commercial Street, Sector 15, Metro City, 400001',
+        email: 'contact@miraclelaundry.com',
+        address: '123 Sparkle Avenue, Suite 4B, Commercial Hub',
         gstNumber: '27AABCU9603R1ZM',
         gstPercentage: 0,
         currencySymbol: '₹',
         currencyCode: 'INR',
-        invoicePrefix: 'ORD-',
+        invoicePrefix: 'ML-',
         termsAndConditions: '1. Please inspect clothes upon delivery.\n2. Clothes not collected within 30 days are subject to storage charges.\n3. Colors may bleed on delicate items if not pre-informed.',
       });
       console.log('[SEED] Default settings created.');
+    } else if (setting.shopName.includes('Intelligent') || setting.logoUrl.includes('unsplash') || setting.logoUrl.includes('Intelligent')) {
+      setting.shopName = 'Miracle Laundry';
+      setting.shopTagline = 'Express & Premium Laundry Services';
+      setting.logoUrl = '/logo.jpg';
+      setting.invoicePrefix = 'ML-';
+      await setting.save();
+      console.log('[SEED] Settings updated with Miracle Laundry branding.');
     }
 
     // 5. Seed Services (11 Main Services + 4 Kg Rates)
