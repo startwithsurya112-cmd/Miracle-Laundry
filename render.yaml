@@ -1,0 +1,32 @@
+services:
+  # 1. Backend Web Service
+  - type: web
+    name: miracle-laundry-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: JWT_SECRET
+        value: miracle_laundry_super_secure_jwt_secret_key_2026
+      - key: MONGODB_URI
+        sync: false
+
+  # 2. Frontend Static Site
+  - type: web
+    name: miracle-laundry-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://miracle-laundry-backend.onrender.com/api
