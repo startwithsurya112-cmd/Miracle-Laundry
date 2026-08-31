@@ -100,21 +100,26 @@ app.use((req: Request, res: Response) => {
 
 // Uptime Keep-Alive Worker (Prevents Render Free Tier from going to sleep)
 const startUptimeKeepAlive = () => {
-  const targetUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL;
-  if (!targetUrl) return;
+  const targetUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || 'https://miracle-laundry-backend.onrender.com';
+  if (!targetUrl || process.env.NODE_ENV === 'test') return;
 
   const healthUrl = `${targetUrl.replace(/\/$/, '')}/api/health`;
   console.log(`[UPTIME] Initializing Uptime Keep-Alive worker targeting: ${healthUrl}`);
 
-  // Self-ping every 10 minutes (600,000 ms)
-  setInterval(async () => {
+  const pingHealth = async () => {
     try {
       const res = await fetch(healthUrl);
       console.log(`[UPTIME PING] Keep-alive ping status: ${res.status} (Server Uptime: ${Math.floor(process.uptime())}s)`);
     } catch (err: any) {
-      console.warn(`[UPTIME PING WARNING] Keep-alive ping failed: ${err.message}`);
+      console.warn(`[UPTIME PING WARNING] Keep-alive ping warning: ${err.message}`);
     }
-  }, 10 * 60 * 1000);
+  };
+
+  // Initial ping after 30s
+  setTimeout(pingHealth, 30000);
+
+  // Self-ping every 8 minutes (480,000 ms) to prevent 15-min sleep
+  setInterval(pingHealth, 8 * 60 * 1000);
 };
 
 // Start Server & Initialize Database
