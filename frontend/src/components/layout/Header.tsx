@@ -66,9 +66,9 @@ export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSide
   };
 
   return (
-    <header className="h-16 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 lg:px-8 flex items-center justify-between sticky top-0 z-20">
+    <header className="h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-2.5 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-30 w-full">
       {/* Mobile Brand / Desktop Search & Live Clock */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
@@ -79,42 +79,42 @@ export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSide
           </button>
         )}
 
-        <div className="lg:hidden flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-white p-0.5 border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 overflow-hidden">
+        <div className="lg:hidden flex items-center gap-1.5 shrink-0">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white p-0.5 border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 overflow-hidden">
             <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover rounded-md" />
           </div>
-          <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1">
-            Miracle Laundry <Sparkles className="w-3 h-3 text-brand-500 fill-brand-500" />
+          <span className="hidden xs:inline-flex font-black text-xs sm:text-sm text-slate-900 dark:text-white items-center gap-1">
+            Miracle <Sparkles className="w-3 h-3 text-brand-500 fill-brand-500" />
           </span>
         </div>
 
         {/* Multi-Branch Selector / Branch Badge */}
         {isSuperAdmin ? (
-          <div className="relative" ref={branchMenuRef}>
+          <div className="relative shrink min-w-0" ref={branchMenuRef}>
             <button
               onClick={() => setShowBranchMenu((prev) => !prev)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold shadow-sm transition-all"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold shadow-sm transition-all max-w-[145px] sm:max-w-none"
             >
               {selectedShop ? (
                 <>
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="font-mono text-[11px] text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/60 px-1.5 py-0.5 rounded border border-brand-200 dark:border-brand-800">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span className="font-mono text-[10px] sm:text-[11px] text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/60 px-1 py-0.5 rounded border border-brand-200 dark:border-brand-800 shrink-0">
                     {selectedShop.code}
                   </span>
-                  <span className="truncate max-w-[120px] sm:max-w-[160px]">{selectedShop.name}</span>
+                  <span className="truncate text-[11px] sm:text-xs">{selectedShop.name}</span>
                 </>
               ) : (
                 <>
-                  <Globe className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>All Branches (Global)</span>
+                  <Globe className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                  <span className="truncate text-[11px] sm:text-xs">All Branches</span>
                 </>
               )}
-              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showBranchMenu ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 shrink-0 transition-transform ${showBranchMenu ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Branch Switcher Dropdown */}
             {showBranchMenu && (
-              <div className="absolute left-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
                 <div className="px-3.5 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Switch Branch Context</span>
                   <span className="text-[10px] text-slate-400 font-mono">{shops.length} Active</span>

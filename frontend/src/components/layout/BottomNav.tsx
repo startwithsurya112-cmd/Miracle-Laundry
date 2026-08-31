@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -11,9 +12,12 @@ import {
   MoreHorizontal,
   Wallet,
   X,
+  Building2,
+  UserCheck,
 } from 'lucide-react';
 
 export const BottomNav: React.FC = () => {
+  const { isSuperAdmin } = useAuth();
   const [showMoreMenu, setShowMoreMenu] = React.useState(false);
 
   return (
@@ -44,6 +48,42 @@ export const BottomNav: React.FC = () => {
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Multi-Branch Admin (Super Admin only) */}
+            {isSuperAdmin && (
+              <>
+                <NavLink
+                  to="/shops"
+                  onClick={() => setShowMoreMenu(false)}
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 hover:bg-indigo-100 font-medium text-slate-800 dark:text-slate-100"
+                >
+                  <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-xs">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-extrabold text-indigo-950 dark:text-indigo-200">Branches & Shops</p>
+                      <span className="text-[9px] font-mono bg-indigo-200/80 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-300 px-1.5 py-0.5 rounded font-bold">HQ</span>
+                    </div>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400">Manage stores, regional hubs & live KPIs</p>
+                  </div>
+                </NavLink>
+
+                <NavLink
+                  to="/users"
+                  onClick={() => setShowMoreMenu(false)}
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/60 hover:bg-purple-100 font-medium text-slate-800 dark:text-slate-100"
+                >
+                  <div className="p-2.5 rounded-xl bg-purple-600 text-white shadow-xs">
+                    <UserCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-extrabold text-purple-950 dark:text-purple-200">Admins & Roles</p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400">Branch managers & staff access permissions</p>
+                  </div>
+                </NavLink>
+              </>
+            )}
 
             {/* 1. Staff & Attendance */}
             <NavLink

@@ -57,7 +57,7 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
+    <div className="flex h-screen h-[100dvh] overflow-hidden bg-slate-50 dark:bg-slate-950">
       {/* Desktop Sidebar */}
       <Sidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={toggleSidebar} />
 
@@ -65,7 +65,7 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <Header isSidebarCollapsed={isSidebarCollapsed} onToggleSidebar={toggleSidebar} />
 
-        <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6">
+        <main className="flex-1 overflow-y-auto px-3 sm:px-8 py-4 sm:py-6 pb-24 lg:pb-8">
           <div className="max-w-7xl mx-auto">{children}</div>
         </main>
 
