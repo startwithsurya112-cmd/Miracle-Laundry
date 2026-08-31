@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import Staff from '../models/Staff';
 import Attendance from '../models/Attendance';
 import IroningWorkLog from '../models/IroningWorkLog';
