@@ -207,7 +207,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         serviceName: item.serviceName || 'Wash & Press',
         quantity: qty,
         unitPrice: price,
-        subtotal: qty * price,
+        subtotal: item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : Math.round(qty * price),
       };
     });
 

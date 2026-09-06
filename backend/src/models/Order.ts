@@ -66,7 +66,7 @@ const OrderItemSchema = new Schema({
   itemName: { type: String, required: true },
   serviceId: { type: Schema.Types.Mixed },
   serviceName: { type: String, required: true },
-  quantity: { type: Number, required: true, min: 1 },
+  quantity: { type: Number, required: true, min: 0.01 },
   unitPrice: { type: Number, required: true, min: 0 },
   subtotal: { type: Number, required: true, min: 0 },
 });

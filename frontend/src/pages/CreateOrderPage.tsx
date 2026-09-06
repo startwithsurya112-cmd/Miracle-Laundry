@@ -105,6 +105,7 @@ export const CreateOrderPage: React.FC = () => {
       unitPrice: number;
       subtotal: number;
       isKgMode?: boolean;
+      isKgPackItem?: boolean;
     }>
   >([]);
 
@@ -185,36 +186,139 @@ export const CreateOrderPage: React.FC = () => {
 
   const currencySymbol = setting?.currencySymbol || '₹';
 
+  // Switch or Select Kg Service Rate Category
+  const handleSelectKgService = (kgServ: KgServiceRate) => {
+    setSelectedKgService(kgServ);
+    setOrderItems((prev) => {
+      const kgLineIdx = prev.findIndex((l) => l.isKgMode);
+      if (kgLineIdx === -1) {
+        return [
+          {
+            itemId: `kg-${Date.now()}`,
+            itemName: `Bulk Laundry - ${kgServ.name} (1 Kg @ ${currencySymbol}${kgServ.ratePerKg}/Kg)`,
+            serviceId: 'service-kg',
+            serviceName: kgServ.name,
+            quantity: 1,
+            unitPrice: kgServ.ratePerKg,
+            subtotal: kgServ.ratePerKg,
+            isKgMode: true,
+          },
+          ...prev,
+        ];
+      }
+      return prev.map((line) => {
+        if (line.isKgMode) {
+          const currentQty = line.quantity || 1;
+          return {
+            ...line,
+            serviceName: kgServ.name,
+            unitPrice: kgServ.ratePerKg,
+            subtotal: Math.round(currentQty * kgServ.ratePerKg),
+            itemName: `Bulk Laundry - ${kgServ.name} (${currentQty} Kg @ ${currencySymbol}${kgServ.ratePerKg}/Kg)`,
+          };
+        }
+        if (line.isKgPackItem) {
+          return {
+            ...line,
+            serviceName: `${kgServ.name} (Kg Pack)`,
+            serviceId: `${kgServ.name.toLowerCase().replace(/\s+/g, '-')}-pack`,
+          };
+        }
+        return line;
+      });
+    });
+  };
+
   // Add Item to Cart (Clicking Card in Quantity or Kg mode)
   const handleCardClick = (item: POSCatalogItem) => {
-    const serviceName = orderMode === 'quantity' ? selectedServiceCategory : selectedKgService.name;
-    const itemOriginalPrice = item.price && item.price > 0 ? item.price : 15;
-    const price = orderMode === 'quantity' ? getItemPriceForService(item, selectedServiceCategory) : itemOriginalPrice;
+    if (orderMode === 'quantity') {
+      const serviceName = selectedServiceCategory;
+      const price = getItemPriceForService(item, selectedServiceCategory);
 
-    setOrderItems((prev) => {
-      const existingIdx = prev.findIndex(
-        (line) => line.itemId === item.id && line.serviceName === serviceName
-      );
-      if (existingIdx !== -1) {
-        const updated = [...prev];
-        const newQty = updated[existingIdx].quantity + 1;
-        updated[existingIdx].quantity = newQty;
-        updated[existingIdx].subtotal = newQty * updated[existingIdx].unitPrice;
+      setOrderItems((prev) => {
+        const existingIdx = prev.findIndex(
+          (line) => line.itemId === item.id && line.serviceName === serviceName && !line.isKgPackItem
+        );
+        if (existingIdx !== -1) {
+          const updated = [...prev];
+          const newQty = updated[existingIdx].quantity + 1;
+          updated[existingIdx].quantity = newQty;
+          updated[existingIdx].subtotal = Math.round(newQty * updated[existingIdx].unitPrice);
+          return updated;
+        }
+        return [
+          ...prev,
+          {
+            itemId: item.id,
+            itemName: item.name,
+            serviceId: serviceName.toLowerCase().replace(/\s+/g, '-'),
+            serviceName,
+            quantity: 1,
+            unitPrice: price,
+            subtotal: price,
+          },
+        ];
+      });
+    } else {
+      // By Weight (Kg) Mode:
+      // Bill is generated as Kg only (Bulk Laundry line item at kg rate).
+      // Each clicked garment item is listed as part of the Kg package at ₹0.
+      setOrderItems((prev) => {
+        let updated = [...prev];
+
+        // 1. Ensure the master Bulk Laundry Kg line item exists for this service
+        const kgLineIdx = updated.findIndex((l) => l.isKgMode);
+        if (kgLineIdx === -1) {
+          updated.unshift({
+            itemId: `kg-${Date.now()}`,
+            itemName: `Bulk Laundry - ${selectedKgService.name} (1 Kg @ ${currencySymbol}${selectedKgService.ratePerKg}/Kg)`,
+            serviceId: 'service-kg',
+            serviceName: selectedKgService.name,
+            quantity: 1,
+            unitPrice: selectedKgService.ratePerKg,
+            subtotal: selectedKgService.ratePerKg,
+            isKgMode: true,
+          });
+        } else if (updated[kgLineIdx].serviceName !== selectedKgService.name) {
+          const currentQty = updated[kgLineIdx].quantity || 1;
+          updated[kgLineIdx] = {
+            ...updated[kgLineIdx],
+            serviceName: selectedKgService.name,
+            unitPrice: selectedKgService.ratePerKg,
+            subtotal: Math.round(currentQty * selectedKgService.ratePerKg),
+            itemName: `Bulk Laundry - ${selectedKgService.name} (${currentQty} Kg @ ${currencySymbol}${selectedKgService.ratePerKg}/Kg)`,
+          };
+        }
+
+        // 2. Add or increment the garment item under the Kg pack
+        const packServiceName = `${selectedKgService.name} (Kg Pack)`;
+        const garmentIdx = updated.findIndex(
+          (l) => l.itemId === item.id && l.isKgPackItem
+        );
+
+        if (garmentIdx !== -1) {
+          const newQty = updated[garmentIdx].quantity + 1;
+          updated[garmentIdx] = {
+            ...updated[garmentIdx],
+            quantity: newQty,
+            subtotal: Math.round(newQty * updated[garmentIdx].unitPrice),
+          };
+        } else {
+          updated.push({
+            itemId: item.id,
+            itemName: item.name,
+            serviceId: `${selectedKgService.name.toLowerCase().replace(/\s+/g, '-')}-pack`,
+            serviceName: packServiceName,
+            quantity: 1,
+            unitPrice: 0,
+            subtotal: 0,
+            isKgPackItem: true,
+          });
+        }
+
         return updated;
-      }
-      return [
-        ...prev,
-        {
-          itemId: item.id,
-          itemName: item.name,
-          serviceId: serviceName.toLowerCase().replace(/\s+/g, '-'),
-          serviceName,
-          quantity: 1,
-          unitPrice: price,
-          subtotal: price,
-        },
-      ];
-    });
+      });
+    }
   };
 
   const updateItemQty = (index: number, newQty: number) => {
@@ -224,17 +328,63 @@ export const CreateOrderPage: React.FC = () => {
     }
     setOrderItems((prev) => {
       const updated = [...prev];
-      updated[index].quantity = newQty;
-      updated[index].subtotal = newQty * updated[index].unitPrice;
+      const line = updated[index];
+      const roundedQty = line.isKgMode ? Math.round(newQty * 10) / 10 : Math.round(newQty);
+      updated[index] = {
+        ...line,
+        quantity: roundedQty,
+        subtotal: Math.round(roundedQty * line.unitPrice),
+        itemName: line.isKgMode
+          ? `Bulk Laundry - ${line.serviceName} (${roundedQty} Kg @ ${currencySymbol}${line.unitPrice}/Kg)`
+          : line.itemName,
+      };
+      return updated;
+    });
+  };
+
+  const updateItemQtyDirect = (index: number, newQty: number) => {
+    const validQty = isNaN(newQty) ? 0 : Math.max(0, newQty);
+    setOrderItems((prev) => {
+      const updated = [...prev];
+      const line = updated[index];
+      const roundedQty = line.isKgMode ? Math.round(validQty * 100) / 100 : Math.round(validQty);
+      updated[index] = {
+        ...line,
+        quantity: roundedQty,
+        subtotal: Math.round(roundedQty * line.unitPrice),
+        itemName: line.isKgMode
+          ? `Bulk Laundry - ${line.serviceName} (${roundedQty} Kg @ ${currencySymbol}${line.unitPrice}/Kg)`
+          : line.itemName,
+      };
       return updated;
     });
   };
 
   const updateItemPrice = (index: number, newPrice: number) => {
+    const validPrice = Math.max(0, isNaN(newPrice) ? 0 : newPrice);
     setOrderItems((prev) => {
       const updated = [...prev];
-      updated[index].unitPrice = Math.max(0, newPrice);
-      updated[index].subtotal = updated[index].quantity * Math.max(0, newPrice);
+      const line = updated[index];
+      updated[index] = {
+        ...line,
+        unitPrice: validPrice,
+        subtotal: Math.round(line.quantity * validPrice),
+        itemName: line.isKgMode
+          ? `Bulk Laundry - ${line.serviceName} (${line.quantity} Kg @ ${currencySymbol}${validPrice}/Kg)`
+          : line.itemName,
+      };
+      return updated;
+    });
+  };
+
+  const updateItemSubtotal = (index: number, newSubtotal: number) => {
+    const validSubtotal = Math.max(0, isNaN(newSubtotal) ? 0 : newSubtotal);
+    setOrderItems((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        subtotal: validSubtotal,
+      };
       return updated;
     });
   };
@@ -461,7 +611,26 @@ export const CreateOrderPage: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setOrderMode('kg')}
+            onClick={() => {
+              setOrderMode('kg');
+              setOrderItems((prev) => {
+                if (prev.length === 0) {
+                  return [
+                    {
+                      itemId: `kg-${Date.now()}`,
+                      itemName: `Bulk Laundry - ${selectedKgService.name} (1 Kg @ ${currencySymbol}${selectedKgService.ratePerKg}/Kg)`,
+                      serviceId: 'service-kg',
+                      serviceName: selectedKgService.name,
+                      quantity: 1,
+                      unitPrice: selectedKgService.ratePerKg,
+                      subtotal: selectedKgService.ratePerKg,
+                      isKgMode: true,
+                    },
+                  ];
+                }
+                return prev;
+              });
+            }}
             className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
               orderMode === 'kg'
                 ? 'bg-brand-600 text-white shadow-md'
@@ -604,58 +773,119 @@ export const CreateOrderPage: React.FC = () => {
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {orderItems.map((line, idx) => (
-                  <div key={idx} className="py-3 flex items-center justify-between gap-2 text-xs">
-                    <div className="flex-1">
-                      <p className="font-bold text-slate-900 dark:text-white">{line.itemName}</p>
-                      <p className="text-[11px] font-semibold text-brand-600 dark:text-brand-400">{line.serviceName}</p>
+                  <div key={idx} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    {/* Item Details */}
+                    <div className="flex-1 min-w-[130px]">
+                      <p className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
+                        {line.itemName}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span
+                          className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            line.isKgMode
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300'
+                              : line.isKgPackItem
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                          }`}
+                        >
+                          {line.serviceName}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Unit Price Editable */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-slate-400 font-bold">{currencySymbol}</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={line.unitPrice}
-                        onChange={(e) => updateItemPrice(idx, Number(e.target.value))}
-                        className="w-16 px-1.5 py-1 text-center font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
-                      />
-                    </div>
+                    {/* Controls: Price, Qty/Weight Stepper, Total Subtotal, Delete */}
+                    <div className="flex items-center flex-wrap gap-2">
+                      {/* 1. Unit Price Input */}
+                      <div className="flex items-center gap-0.5 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <span className="text-slate-400 font-bold text-xs">{currencySymbol}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={line.unitPrice}
+                          onChange={(e) => updateItemPrice(idx, parseFloat(e.target.value) || 0)}
+                          className="w-12 text-center font-bold text-xs bg-transparent outline-none text-slate-900 dark:text-white"
+                          title="Unit Price"
+                        />
+                        {line.isKgMode && (
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">/Kg</span>
+                        )}
+                        {line.isKgPackItem && (
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">(Kg Pack)</span>
+                        )}
+                      </div>
 
-                    {/* Qty Stepper */}
-                    {!line.isKgMode && (
-                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
+                      {/* 2. Quantity / Weight with Steppers */}
+                      <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200 dark:border-slate-700">
                         <button
                           type="button"
-                          onClick={() => updateItemQty(idx, line.quantity - 1)}
-                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold flex items-center justify-center hover:bg-slate-200"
+                          onClick={() =>
+                            updateItemQty(
+                              idx,
+                              line.isKgMode
+                                ? Math.max(0.5, Number((line.quantity - 1).toFixed(1)))
+                                : line.quantity - 1
+                            )
+                          }
+                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 shadow-xs"
+                          title="Decrease"
                         >
                           -
                         </button>
-                        <span className="w-5 text-center font-bold text-slate-900 dark:text-white">
-                          {line.quantity}
-                        </span>
+                        <input
+                          type="number"
+                          step={line.isKgMode ? '0.1' : '1'}
+                          min="0.1"
+                          value={line.quantity}
+                          onChange={(e) => updateItemQtyDirect(idx, parseFloat(e.target.value))}
+                          className="w-10 text-center font-bold text-xs bg-transparent outline-none text-slate-900 dark:text-white"
+                          title="Quantity or Weight in Kg"
+                        />
+                        {line.isKgMode && (
+                          <span className="text-[10px] font-extrabold text-slate-600 dark:text-slate-300 pr-1">
+                            Kg
+                          </span>
+                        )}
                         <button
                           type="button"
-                          onClick={() => updateItemQty(idx, line.quantity + 1)}
-                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold flex items-center justify-center hover:bg-slate-200"
+                          onClick={() =>
+                            updateItemQty(
+                              idx,
+                              line.isKgMode
+                                ? Number((line.quantity + 1).toFixed(1))
+                                : line.quantity + 1
+                            )
+                          }
+                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 shadow-xs"
+                          title="Increase"
                         >
                           +
                         </button>
                       </div>
-                    )}
 
-                    <div className="w-16 text-right font-black text-slate-900 dark:text-white">
-                      {currencySymbol}{line.subtotal}
+                      {/* 3. Subtotal Input */}
+                      <div className="flex items-center gap-0.5 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <span className="text-slate-400 font-bold text-xs">{currencySymbol}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={line.subtotal}
+                          onChange={(e) => updateItemSubtotal(idx, parseFloat(e.target.value) || 0)}
+                          className="w-14 text-center font-black text-xs bg-transparent outline-none text-slate-900 dark:text-white"
+                          title="Item Subtotal"
+                        />
+                      </div>
+
+                      {/* 4. Delete Item */}
+                      <button
+                        type="button"
+                        onClick={() => removeItem(idx)}
+                        className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors shrink-0"
+                        title="Remove Item"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => removeItem(idx)}
-                      className="p-1 text-slate-400 hover:text-rose-500"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
                 ))}
               </div>
@@ -958,7 +1188,7 @@ export const CreateOrderPage: React.FC = () => {
                     return (
                       <div
                         key={kgServ.name}
-                        onClick={() => setSelectedKgService(kgServ)}
+                        onClick={() => handleSelectKgService(kgServ)}
                         className={`p-3 rounded-2xl border cursor-pointer transition-all duration-150 select-none flex flex-col justify-between ${
                           active
                             ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-600/30'
