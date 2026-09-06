@@ -84,7 +84,6 @@ export const CreateOrderPage: React.FC = () => {
 
   // 3. Kg Mode Selected Service (Default: 'Wash & Iron', Rate: 120)
   const [selectedKgService, setSelectedKgService] = useState<KgServiceRate>(kgServicesList[0]);
-  const [kgWeight, setKgWeight] = useState<string>('1');
 
   // 4. Active Target Group (Default: 'Regular')
   const [activeGroup, setActiveGroup] = useState<'Regular' | 'Men' | 'Women' | 'Kids' | 'Household' | 'Others'>('Regular');
@@ -189,7 +188,8 @@ export const CreateOrderPage: React.FC = () => {
   // Add Item to Cart (Clicking Card in Quantity or Kg mode)
   const handleCardClick = (item: POSCatalogItem) => {
     const serviceName = orderMode === 'quantity' ? selectedServiceCategory : selectedKgService.name;
-    const price = orderMode === 'quantity' ? getItemPriceForService(item, selectedServiceCategory) : selectedKgService.ratePerKg;
+    const itemOriginalPrice = item.price && item.price > 0 ? item.price : 15;
+    const price = orderMode === 'quantity' ? getItemPriceForService(item, selectedServiceCategory) : itemOriginalPrice;
 
     setOrderItems((prev) => {
       const existingIdx = prev.findIndex(
@@ -215,27 +215,6 @@ export const CreateOrderPage: React.FC = () => {
         },
       ];
     });
-  };
-
-  // Add Direct Kg Weight Line Item to Cart
-  const addKgWeightItemToCart = () => {
-    const weightNum = parseFloat(kgWeight) || 1;
-    const rateNum = selectedKgService.ratePerKg;
-    const itemSubtotal = Math.round(weightNum * rateNum);
-
-    setOrderItems((prev) => [
-      ...prev,
-      {
-        itemId: `kg-${Date.now()}`,
-        itemName: `Bulk Laundry (${weightNum} Kg @ ${currencySymbol}${rateNum}/Kg)`,
-        serviceId: 'service-kg',
-        serviceName: selectedKgService.name,
-        quantity: 1,
-        unitPrice: itemSubtotal,
-        subtotal: itemSubtotal,
-        isKgMode: true,
-      },
-    ]);
   };
 
   const updateItemQty = (index: number, newQty: number) => {
@@ -1004,46 +983,7 @@ export const CreateOrderPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 2. Direct Kg Weight Input Bar */}
-              <div className="p-4 rounded-2xl bg-brand-50/70 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-900 space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Total Weight (Kg)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={kgWeight}
-                      onChange={(e) => setKgWeight(e.target.value)}
-                      className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <span className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Rate per Kg
-                    </span>
-                    <div className="px-3 py-2 text-xs font-black rounded-xl bg-slate-100 dark:bg-slate-800 text-brand-600 dark:text-brand-400 border border-slate-200 dark:border-slate-700">
-                      {currencySymbol}{selectedKgService.ratePerKg}/Kg
-                    </div>
-                  </div>
-
-                  <div className="col-span-2 sm:col-span-1">
-                    <button
-                      type="button"
-                      onClick={addKgWeightItemToCart}
-                      className="w-full py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-extrabold text-xs shadow-md shadow-brand-600/30 flex items-center justify-center gap-1 active:scale-95 transition-all"
-                    >
-                      <Plus className="w-4 h-4 stroke-[2.5]" />
-                      <span>Add Bulk Kg</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Target Group Garment Items Selection for Kg Mode */}
+              {/* Garment Items Selection for Selected Service */}
               <div className="pt-2 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="block text-xs font-extrabold uppercase tracking-wider text-slate-400">
@@ -1053,7 +993,7 @@ export const CreateOrderPage: React.FC = () => {
 
                 {/* Target Group Tabs */}
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                  {posGroupCatalog.map((grp) => {
+                  {activeCatalog.map((grp) => {
                     const active = activeGroup === grp.groupName;
                     return (
                       <button
@@ -1131,7 +1071,7 @@ export const CreateOrderPage: React.FC = () => {
 
                           <div className="mt-2.5 flex items-center justify-between">
                             <span className="font-black text-brand-600 dark:text-brand-400 group-hover:text-white text-xs">
-                              {currencySymbol}{selectedKgService.ratePerKg}/Kg
+                              {currencySymbol}{item.price && item.price > 0 ? item.price : 15}
                             </span>
                             <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300 group-hover:bg-white/20 group-hover:text-white">
                               Select
