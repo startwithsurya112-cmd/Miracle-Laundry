@@ -39,9 +39,11 @@ import {
 } from 'lucide-react';
 
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 export const AccountsPage: React.FC = () => {
   const { showToast } = useToast();
+  const { selectedShop, selectedShopId } = useAuth();
   const [activeTab, setActiveTab] = useState<'orders' | 'shop'>('orders');
   const [setting, setSetting] = useState<Setting | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
@@ -130,7 +132,7 @@ export const AccountsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [activeTab, transDateFrom, transDateTo, transPaymentMethod, expCategoryFilter, expPaymentMethodFilter, expSearch, expPage, expLimit]);
+  }, [selectedShopId, activeTab, transDateFrom, transDateTo, transPaymentMethod, expCategoryFilter, expPaymentMethodFilter, expSearch, expPage, expLimit]);
 
   const currencySymbol = setting?.currencySymbol || '₹';
 
@@ -181,6 +183,7 @@ export const AccountsPage: React.FC = () => {
       ...expFormData,
       category: categoryName,
       description: categoryName,
+      shopId: selectedShopId !== 'all' ? selectedShopId : undefined,
     };
 
     setIsSavingExpense(true);
@@ -254,6 +257,17 @@ export const AccountsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {selectedShop && (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span>
+              Branch Accounts: <strong className="text-indigo-600 dark:text-indigo-400">[{selectedShop.code}] {selectedShop.name}</strong> ({selectedShop.region})
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* TABS SWITCHER (Order Accounts vs Shop Accounts) */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2">

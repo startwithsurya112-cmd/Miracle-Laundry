@@ -97,6 +97,10 @@ export const getCustomerById = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
 
+    if (req.user?.role !== 'super_admin' && req.targetShopId && customerObj.shopId && String(customerObj.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: this customer belongs to another branch.' });
+    }
+
     let orderFilter: any = {
       $or: [{ customer: customerObj._id }, { 'customerSnapshot.mobile': customerObj.mobile }],
     };
@@ -128,7 +132,7 @@ export const createCustomer = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: 'Name, mobile number, and address are required' });
     }
 
-    const targetShop = req.targetShopId || shopId || null;
+    const targetShop = req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId;
     const existingQuery: any = { mobile };
     if (targetShop) {
       existingQuery.shopId = targetShop;
@@ -171,6 +175,10 @@ export const updateCustomer = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
 
+    if (req.user?.role !== 'super_admin' && req.targetShopId && customer.shopId && String(customer.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: this customer belongs to another branch.' });
+    }
+
     if (mobile && mobile !== customer.mobile) {
       const existingQuery: any = { mobile, _id: { $ne: req.params.id } };
       if (req.targetShopId) {
@@ -187,7 +195,7 @@ export const updateCustomer = async (req: AuthRequest, res: Response) => {
     if (address) customer.address = address;
     if (email !== undefined) customer.email = email;
     if (notes !== undefined) customer.notes = notes;
-    if (shopId !== undefined) customer.shopId = shopId;
+    if (shopId !== undefined && req.user?.role === 'super_admin') customer.shopId = shopId;
 
     await customer.save();
 
@@ -206,6 +214,10 @@ export const deleteCustomer = async (req: AuthRequest, res: Response) => {
     const customer = await Customer.findById(req.params.id);
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.targetShopId && customer.shopId && String(customer.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: this customer belongs to another branch.' });
     }
 
     const orderCount = await Order.countDocuments({

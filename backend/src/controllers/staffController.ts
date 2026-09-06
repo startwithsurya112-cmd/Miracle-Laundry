@@ -29,7 +29,7 @@ export const createStaff = async (req: AuthRequest, res: Response) => {
     }
 
     const newStaff = new Staff({
-      shopId: req.targetShopId || shopId || null,
+      shopId: req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId,
       name: name.trim(),
       mobile: mobile ? mobile.trim() : '',
       role: role ? role.trim() : 'Ironing Staff',
@@ -56,13 +56,17 @@ export const updateStaff = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
     }
 
+    if (req.user?.role !== 'super_admin' && req.targetShopId && staff.shopId && String(staff.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: staff belongs to another branch.' });
+    }
+
     if (name) staff.name = name.trim();
     if (mobile !== undefined) staff.mobile = mobile.trim();
     if (role !== undefined) staff.role = role.trim();
     if (assignedTable !== undefined) staff.assignedTable = assignedTable.trim();
     if (status) staff.status = status;
     if (removeDate !== undefined) staff.removeDate = removeDate ? new Date(removeDate) : undefined;
-    if (shopId !== undefined) staff.shopId = shopId;
+    if (shopId !== undefined && req.user?.role === 'super_admin') staff.shopId = shopId;
 
     await staff.save();
     return res.json({ success: true, staff, message: 'Staff profile updated.' });
@@ -74,6 +78,15 @@ export const updateStaff = async (req: AuthRequest, res: Response) => {
 export const deleteStaff = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const staff = await Staff.findById(id);
+    if (!staff) {
+      return res.status(404).json({ success: false, message: 'Staff member not found.' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.targetShopId && staff.shopId && String(staff.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: staff belongs to another branch.' });
+    }
+
     await Staff.findByIdAndDelete(id);
     return res.json({ success: true, message: 'Staff member removed.' });
   } catch (error: any) {
@@ -174,6 +187,10 @@ export const markAttendance = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
     }
 
+    if (req.user?.role !== 'super_admin' && req.targetShopId && staffMember.shopId && String(staffMember.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: staff belongs to another branch.' });
+    }
+
     const targetDate = date ? new Date(date) : new Date();
     const start = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0);
     const end = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59);
@@ -211,13 +228,19 @@ export const markAttendance = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const deleteAttendance = async (req: Request, res: Response) => {
+export const deleteAttendance = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const deleted = await Attendance.findByIdAndDelete(id);
-    if (!deleted) {
+    const record = await Attendance.findById(id);
+    if (!record) {
       return res.status(404).json({ success: false, message: 'Attendance record not found.' });
     }
+
+    if (req.user?.role !== 'super_admin' && req.targetShopId && record.shopId && String(record.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: attendance belongs to another branch.' });
+    }
+
+    await Attendance.findByIdAndDelete(id);
     return res.json({ success: true, message: 'Attendance record deleted successfully.' });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: error.message });
@@ -270,11 +293,16 @@ export const logIroningWork = async (req: AuthRequest, res: Response) => {
     let finalStaffName = staffName || 'Ironing Staff';
     if (staffId) {
       const s = await Staff.findById(staffId);
-      if (s) finalStaffName = s.name;
+      if (s) {
+        if (req.user?.role !== 'super_admin' && req.targetShopId && s.shopId && String(s.shopId) !== req.targetShopId) {
+          return res.status(403).json({ success: false, message: 'Access denied: staff belongs to another branch.' });
+        }
+        finalStaffName = s.name;
+      }
     }
 
     const newLog = new IroningWorkLog({
-      shopId: req.targetShopId || shopId || null,
+      shopId: req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId,
       staff: staffId || undefined,
       staffName: finalStaffName,
       tableName: tableName.trim(),

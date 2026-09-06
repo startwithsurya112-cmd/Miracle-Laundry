@@ -1,12 +1,21 @@
 import Order from '../models/Order';
 import Setting from '../models/Setting';
+import Shop from '../models/Shop';
 
-export const generateOrderNumber = async (): Promise<string> => {
+export const generateOrderNumber = async (shopId?: any): Promise<string> => {
   let prefix = 'ORD-';
   try {
-    const setting = await Setting.findOne();
-    if (setting && setting.invoicePrefix) {
-      prefix = setting.invoicePrefix;
+    if (shopId) {
+      const shop = await Shop.findById(shopId);
+      if (shop && shop.invoicePrefix) {
+        prefix = shop.invoicePrefix.endsWith('-') ? shop.invoicePrefix : `${shop.invoicePrefix}-`;
+      }
+    }
+    if (prefix === 'ORD-') {
+      const setting = await Setting.findOne();
+      if (setting && setting.invoicePrefix) {
+        prefix = setting.invoicePrefix;
+      }
     }
   } catch (err) {
     // fallback

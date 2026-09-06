@@ -58,8 +58,8 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: `Username '${cleanUsername}' is already taken.` });
     }
 
-    if (role === 'branch_admin' && !shopId) {
-      return res.status(400).json({ success: false, message: 'Shop assignment is required for Branch Admins.' });
+    if (role !== 'super_admin' && !shopId) {
+      return res.status(400).json({ success: false, message: 'Shop assignment is required for Branch Admins and Staff.' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);

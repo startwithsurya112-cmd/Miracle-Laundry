@@ -12,6 +12,7 @@ import { Customer, Order, Setting } from '../types';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { StatusBadge } from '../components/ui/Badge';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import {
   Users,
   Search,
@@ -31,6 +32,7 @@ import {
 
 export const CustomersPage: React.FC = () => {
   const { showToast } = useToast();
+  const { selectedShop, selectedShopId } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [setting, setSetting] = useState<Setting | undefined>(undefined);
@@ -89,8 +91,12 @@ export const CustomersPage: React.FC = () => {
   };
 
   useEffect(() => {
+    setPage(1);
+  }, [selectedShopId]);
+
+  useEffect(() => {
     loadCustomers();
-  }, [search, page, limit]);
+  }, [search, page, limit, selectedShopId]);
 
   const currencySymbol = setting?.currencySymbol || '₹';
 
@@ -202,6 +208,21 @@ export const CustomersPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Branch Context Indicator */}
+      {selectedShop && (
+        <div className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-50 via-white to-brand-50 dark:from-indigo-950/40 dark:via-slate-900 dark:to-brand-950/40 border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-semibold text-slate-700 dark:text-slate-200">
+              Branch Customers: <strong className="text-indigo-600 dark:text-indigo-400">[{selectedShop.code}] {selectedShop.name}</strong> ({selectedShop.region})
+            </span>
+          </div>
+          <span className="text-[11px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+            {totalCustomers} registered
+          </span>
+        </div>
+      )}
 
       {/* Search Input */}
       <div className="glass-card p-4">

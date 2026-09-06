@@ -86,7 +86,7 @@ export const createExpense = async (req: AuthRequest, res: Response) => {
     const voucherNumber = await generateVoucherNumber();
 
     const expense = new Expense({
-      shopId: req.targetShopId || shopId || null,
+      shopId: req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId,
       voucherNumber,
       category,
       description,
@@ -118,6 +118,10 @@ export const updateExpense = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Expense record not found' });
     }
 
+    if (req.user?.role !== 'super_admin' && req.targetShopId && expense.shopId && String(expense.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: this expense belongs to another branch.' });
+    }
+
     if (category) expense.category = category;
     if (description) expense.description = description;
     if (amount !== undefined) expense.amount = Number(amount);
@@ -125,7 +129,7 @@ export const updateExpense = async (req: AuthRequest, res: Response) => {
     if (paidTo !== undefined) expense.paidTo = paidTo;
     if (expenseDate) expense.expenseDate = new Date(expenseDate);
     if (notes !== undefined) expense.notes = notes;
-    if (shopId !== undefined) expense.shopId = shopId;
+    if (shopId !== undefined && req.user?.role === 'super_admin') expense.shopId = shopId;
 
     await expense.save();
 
@@ -144,6 +148,10 @@ export const deleteExpense = async (req: AuthRequest, res: Response) => {
     const expense = await Expense.findById(req.params.id);
     if (!expense) {
       return res.status(404).json({ success: false, message: 'Expense record not found' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.targetShopId && expense.shopId && String(expense.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: this expense belongs to another branch.' });
     }
 
     await Expense.findByIdAndDelete(req.params.id);

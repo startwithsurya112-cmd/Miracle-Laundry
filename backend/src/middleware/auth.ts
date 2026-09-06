@@ -57,7 +57,13 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
       req.targetShopId = selected && selected !== 'all' && selected !== 'null' && selected !== 'undefined' ? selected : null;
     } else {
       // Branch Admin or Staff is strictly locked to their assigned shopId
-      req.targetShopId = decoded.shopId ? String(decoded.shopId) : null;
+      if (!decoded.shopId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Your account is not assigned to any branch. Please contact the Super Admin.',
+        });
+      }
+      req.targetShopId = String(decoded.shopId);
     }
 
     next();

@@ -29,10 +29,13 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
+  Building2,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export const ReportsPage: React.FC = () => {
   const { showToast } = useToast();
+  const { selectedShop, selectedShopId } = useAuth();
   const [activeTab, setActiveTab] = useState<'pnl' | 'revenue' | 'customers'>('pnl');
   const [periodPreset, setPeriodPreset] = useState<string>('current_month');
 
@@ -95,7 +98,7 @@ export const ReportsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [period, periodPreset]);
+  }, [selectedShopId, period, periodPreset]);
 
   const currencySymbol = setting?.currencySymbol || '₹';
 
@@ -104,10 +107,14 @@ export const ReportsPage: React.FC = () => {
       showToast('⏳ Generating export file...', 'info');
       const token = getAuthToken();
       const baseUrl = getApiBaseUrl();
+      const exportHeaders: Record<string, string> = {
+        'Authorization': `Bearer ${token || ''}`,
+      };
+      if (selectedShopId && selectedShopId !== 'all') {
+        exportHeaders['X-Shop-Id'] = selectedShopId;
+      }
       const res = await fetch(`${baseUrl}/reports/export?type=${type}&token=${encodeURIComponent(token || '')}`, {
-        headers: {
-          'Authorization': `Bearer ${token || ''}`,
-        },
+        headers: exportHeaders,
       });
 
       if (!res.ok) {
@@ -168,6 +175,17 @@ export const ReportsPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {selectedShop && (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span>
+              Branch Analytics & Financials: <strong className="text-indigo-600 dark:text-indigo-400">[{selectedShop.code}] {selectedShop.name}</strong> ({selectedShop.region})
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Main View Mode Selector Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-3 pb-2">

@@ -76,6 +76,14 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
   );
 };
 
+const SuperAdminOnly: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isSuperAdmin } = useAuth();
+  if (!isSuperAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <>{children}</>;
+};
+
 export const AppContent: React.FC = () => {
   return (
     <Routes>
@@ -188,7 +196,9 @@ export const AppContent: React.FC = () => {
         path="/shops"
         element={
           <ProtectedLayout>
-            <ShopsPage />
+            <SuperAdminOnly>
+              <ShopsPage />
+            </SuperAdminOnly>
           </ProtectedLayout>
         }
       />
@@ -197,7 +207,9 @@ export const AppContent: React.FC = () => {
         path="/users"
         element={
           <ProtectedLayout>
-            <UsersPage />
+            <SuperAdminOnly>
+              <UsersPage />
+            </SuperAdminOnly>
           </ProtectedLayout>
         }
       />

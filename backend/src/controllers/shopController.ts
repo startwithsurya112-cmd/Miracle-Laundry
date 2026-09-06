@@ -14,6 +14,10 @@ export const getShops = async (req: AuthRequest, res: Response) => {
     const { search, region, activeOnly } = req.query;
     let filter: any = {};
 
+    if (req.user?.role !== 'super_admin') {
+      filter._id = req.user?.shopId;
+    }
+
     if (activeOnly === 'true') {
       filter.isActive = true;
     }
@@ -110,9 +114,12 @@ export const getShops = async (req: AuthRequest, res: Response) => {
 };
 
 // GET shop by ID
-export const getShopById = async (req: Request, res: Response) => {
+export const getShopById = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    if (req.user?.role !== 'super_admin' && req.targetShopId && String(req.targetShopId) !== String(id)) {
+      return res.status(403).json({ success: false, message: 'Access denied: You can only view your own branch.' });
+    }
     const shop = await Shop.findById(id);
     if (!shop) {
       return res.status(404).json({ success: false, message: 'Shop not found' });

@@ -79,7 +79,7 @@ export const logMachineCycle = async (req: AuthRequest, res: Response) => {
     }
 
     const newLog = new MachineLog({
-      shopId: req.targetShopId || shopId || null,
+      shopId: req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId,
       machineType,
       date: targetDate,
       programName: programName.trim(),
@@ -155,7 +155,7 @@ export const logGasCylinder = async (req: AuthRequest, res: Response) => {
     }
 
     const newLog = new GasCylinderLog({
-      shopId: req.targetShopId || shopId || null,
+      shopId: req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId,
       changeDate: targetDate,
       quantity: Number(quantity) || 1,
       daysLasted: 0,
@@ -179,10 +179,16 @@ export const logGasCylinder = async (req: AuthRequest, res: Response) => {
 export const deleteGasCylinder = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const deleted = await GasCylinderLog.findByIdAndDelete(id);
-    if (!deleted) {
+    const cylinder = await GasCylinderLog.findById(id);
+    if (!cylinder) {
       return res.status(404).json({ success: false, message: 'Cylinder log not found.' });
     }
+
+    if (req.user?.role !== 'super_admin' && req.targetShopId && cylinder.shopId && String(cylinder.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: cylinder belongs to another branch.' });
+    }
+
+    await GasCylinderLog.findByIdAndDelete(id);
     return res.json({ success: true, message: 'Cylinder log deleted successfully.' });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: error.message });

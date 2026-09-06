@@ -8,19 +8,19 @@ const toAmount = (val: any): string => {
   return isNaN(num) ? '0.00' : num.toFixed(2);
 };
 
-export const generateInvoicePDFBuffer = async (order: any, setting?: any): Promise<Buffer> => {
+export const generateInvoicePDFBuffer = async (order: any, setting?: any, shop?: any): Promise<Buffer> => {
   // Generate QR Code PNG Buffer
   let qrBuffer: Buffer | null = null;
-  const upiId = setting?.upiId || 'intelligentno1laundry@gmail.com';
-  const shopName = setting?.shopName && setting.shopName !== 'IntelligentLaundry & Dry Cleaners'
-    ? setting.shopName
-    : 'Intelligent Laundry';
+  const effectiveShop = shop || (order.shopId && typeof order.shopId === 'object' ? order.shopId : null);
+  const upiId = effectiveShop?.upiId || setting?.upiId || 'miraclelaundry@upi';
+  const shopName = effectiveShop?.name || setting?.shopName || 'Miracle Laundry';
   const dueAmount = (order.remainingBalance && order.remainingBalance > 0) ? order.remainingBalance : order.totalAmount;
   const upiPaymentUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shopName)}&am=${dueAmount}&cu=INR&tn=${encodeURIComponent('Order #' + order.orderNumber)}`;
 
-  if (setting?.paymentQrUrl && setting.paymentQrUrl.startsWith('data:image')) {
+  const paymentQrUrl = effectiveShop?.paymentQrUrl || setting?.paymentQrUrl;
+  if (paymentQrUrl && paymentQrUrl.startsWith('data:image')) {
     try {
-      const base64Data = setting.paymentQrUrl.replace(/^data:image\/\w+;base64,/, '');
+      const base64Data = paymentQrUrl.replace(/^data:image\/\w+;base64,/, '');
       qrBuffer = Buffer.from(base64Data, 'base64');
     } catch (e) {}
   }
@@ -42,10 +42,10 @@ export const generateInvoicePDFBuffer = async (order: any, setting?: any): Promi
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', (err) => reject(err));
 
-      const address = setting?.address || '2/516 B Thiruvalluvar Nagar, Near ambal hospital, Malumichampatti, Coimbatore 641050';
-      const phone = setting?.phone || '+91 98765 43210';
-      const email = setting?.email || 'intelligentno1laundry@gmail.com';
-      const gstNumber = setting?.gstNumber || '';
+      const address = effectiveShop?.address || setting?.address || '123 Sparkle Avenue, Suite 4B, Commercial Hub';
+      const phone = effectiveShop?.phone || setting?.phone || '+91 98765 43210';
+      const email = effectiveShop?.email || setting?.email || 'contact@miraclelaundry.com';
+      const gstNumber = effectiveShop?.gstNumber || setting?.gstNumber || '';
 
       // Check for store logo image
       const possibleLogoPaths = [

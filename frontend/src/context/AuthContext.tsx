@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return getSelectedShopId() || 'all';
   });
 
-  const isSuperAdmin = !admin?.role || admin?.role === 'super_admin';
+  const isSuperAdmin = Boolean(admin && admin.role === 'super_admin');
 
   const loadShops = async () => {
     try {
@@ -58,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const res = await getMe();
           if (res.success && res.admin) {
             setAdmin(res.admin);
-            if (res.admin.role === 'branch_admin' && res.admin.shopId) {
+            if (res.admin.role !== 'super_admin' && res.admin.shopId) {
               const bShopId = String(res.admin.shopId);
               setSelectedShopIdState(bShopId);
               setSelectedShopId(bShopId);
@@ -91,6 +91,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [admin]);
 
   const selectShop = (shopId: string | 'all') => {
+    // Non-super-admins are strictly locked to their assigned branch
+    if (admin && admin.role !== 'super_admin') {
+      return;
+    }
     const cleanId = shopId === 'all' ? 'all' : shopId;
     setSelectedShopIdState(cleanId);
     setSelectedShopId(cleanId === 'all' ? null : cleanId);
@@ -108,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAuthToken(res.token);
         setAdmin(res.admin);
 
-        if (res.admin.role === 'branch_admin' && res.admin.shopId) {
+        if (res.admin.role !== 'super_admin' && res.admin.shopId) {
           const bId = String(res.admin.shopId);
           setSelectedShopIdState(bId);
           setSelectedShopId(bId);

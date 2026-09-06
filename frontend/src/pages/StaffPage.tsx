@@ -32,11 +32,14 @@ import {
   ChevronDown,
   FileText,
   DollarSign,
+  Building2,
 } from 'lucide-react';
 import { PayslipModal } from '../components/staff/PayslipModal';
+import { useAuth } from '../context/AuthContext';
 
 export const StaffPage: React.FC = () => {
   const { showToast } = useToast();
+  const { selectedShop, selectedShopId } = useAuth();
   const [activeTab, setActiveTab] = useState<'attendance' | 'ironing' | 'performance'>('attendance');
 
   // Core Data State
@@ -154,7 +157,7 @@ export const StaffPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [reportFilter, attendanceFilter, attStartDate, attEndDate, repStartDate, repEndDate]);
+  }, [selectedShopId, reportFilter, attendanceFilter, attStartDate, attEndDate, repStartDate, repEndDate]);
 
   // Handle Add Staff Submit
   const handleSaveStaff = async (e: React.FormEvent) => {
@@ -164,7 +167,10 @@ export const StaffPage: React.FC = () => {
       return;
     }
     try {
-      const res = await createStaffApi(newStaff);
+      const res = await createStaffApi({
+        ...newStaff,
+        shopId: selectedShopId !== 'all' ? selectedShopId : undefined,
+      });
       if (res.success) {
         showToast('Staff member added successfully!', 'success');
         setIsAddStaffOpen(false);
@@ -359,6 +365,20 @@ export const StaffPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {selectedShop && (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span>
+              Branch Staff & Roster: <strong className="text-indigo-600 dark:text-indigo-400">[{selectedShop.code}] {selectedShop.name}</strong> ({selectedShop.region})
+            </span>
+          </div>
+          <span className="text-[11px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+            {staffList.length} members
+          </span>
+        </div>
+      )}
 
       {/* Tabs Bar */}
       <div className="flex flex-wrap items-center gap-2 glass-card p-1.5">

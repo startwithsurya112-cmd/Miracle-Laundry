@@ -143,7 +143,14 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       shopId,
     } = req.body;
 
-    const assignedShopId = req.targetShopId || shopId || null;
+    let assignedShopId = req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId;
+
+    if (!assignedShopId) {
+      const defaultShop = await Shop.findOne({ isActive: true }).sort({ createdAt: 1 });
+      if (defaultShop) {
+        assignedShopId = defaultShop._id.toString();
+      }
+    }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'At least one laundry item is required' });
@@ -221,7 +228,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       paymentStatus = 'Partially Paid';
     }
 
-    const orderNumber = await generateOrderNumber();
+    const orderNumber = await generateOrderNumber(assignedShopId);
 
     // QR Content for digital receipt
     const qrData = JSON.stringify({
@@ -312,13 +319,17 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const updateOrderStatus = async (req: Request, res: Response) => {
+export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
   try {
     const { status, note } = req.body;
     const order = await Order.findById(req.params.id);
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
     }
 
     const validStatuses: OrderStatus[] = [
@@ -398,11 +409,15 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
   }
 };
 
-export const sendOrderWhatsAppPDF = async (req: Request, res: Response) => {
+export const sendOrderWhatsAppPDF = async (req: AuthRequest, res: Response) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
     }
 
     let mobile = order.customerSnapshot?.mobile;
@@ -416,7 +431,8 @@ export const sendOrderWhatsAppPDF = async (req: Request, res: Response) => {
     }
 
     const setting = await Setting.findOne();
-    const pdfBuffer = await generateInvoicePDFBuffer(order, setting);
+    const shop = order.shopId ? await Shop.findById(order.shopId) : null;
+    const pdfBuffer = await generateInvoicePDFBuffer(order, setting, shop);
     const fileName = `Invoice_${order.orderNumber.replace(/[\/\\]/g, '_')}.pdf`;
 
     const sent = await sendAutomatedWhatsAppDocument(mobile, pdfBuffer, fileName);
@@ -431,15 +447,20 @@ export const sendOrderWhatsAppPDF = async (req: Request, res: Response) => {
   }
 };
 
-export const getOrderPDF = async (req: Request, res: Response) => {
+export const getOrderPDF = async (req: AuthRequest, res: Response) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
+    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
+    }
+
     const setting = await Setting.findOne();
-    const pdfBuffer = await generateInvoicePDFBuffer(order, setting);
+    const shop = order.shopId ? await Shop.findById(order.shopId) : null;
+    const pdfBuffer = await generateInvoicePDFBuffer(order, setting, shop);
     const fileName = `Invoice_${order.orderNumber.replace(/[\/\\]/g, '_')}.pdf`;
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -450,13 +471,17 @@ export const getOrderPDF = async (req: Request, res: Response) => {
   }
 };
 
-export const recordOrderPayment = async (req: Request, res: Response) => {
+export const recordOrderPayment = async (req: AuthRequest, res: Response) => {
   try {
     const { amount, paymentMethod, transactionId, note } = req.body;
     const order = await Order.findById(req.params.id);
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
     }
 
     const payAmount = Number(amount);
@@ -502,11 +527,15 @@ export const recordOrderPayment = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteOrder = async (req: Request, res: Response) => {
+export const deleteOrder = async (req: AuthRequest, res: Response) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
     }
 
     await Order.findByIdAndDelete(req.params.id);
@@ -518,13 +547,17 @@ export const deleteOrder = async (req: Request, res: Response) => {
   }
 };
 
-export const updateOrder = async (req: Request, res: Response) => {
+export const updateOrder = async (req: AuthRequest, res: Response) => {
   try {
     const { items, status, paymentStatus, paymentMethod, advancePaid, expectedDeliveryDate, notes, discount } = req.body;
     const order = await Order.findById(req.params.id);
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
+      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
     }
 
     if (items && Array.isArray(items)) {

@@ -105,7 +105,7 @@ export const seedDatabase = async () => {
         termsAndConditions: '1. Please inspect clothes upon delivery.\n2. Clothes not collected within 30 days are subject to storage charges.\n3. Colors may bleed on delicate items if not pre-informed.',
       });
       console.log('[SEED] Default settings created.');
-    } else if (setting.shopName.includes('Intelligent') || setting.logoUrl.includes('unsplash') || setting.logoUrl.includes('Intelligent')) {
+    } else if (setting.shopName.includes('Intelligent') || (setting.logoUrl && (setting.logoUrl.includes('unsplash') || setting.logoUrl.includes('Intelligent')))) {
       setting.shopName = 'Miracle Laundry';
       setting.shopTagline = 'Express & Premium Laundry Services';
       setting.logoUrl = '/logo.jpg';

@@ -199,6 +199,15 @@ export const UsersPage: React.FC = () => {
     return matchesSearch && matchesRole && matchesShop;
   });
 
+  if (!isSuperAdmin) {
+    return (
+      <div className="p-12 text-center text-slate-500">
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Access Denied</h2>
+        <p className="mt-2 text-sm">Only Super Admins have permission to manage users and roles.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}

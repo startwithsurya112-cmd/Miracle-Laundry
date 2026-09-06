@@ -30,9 +30,11 @@ import {
 } from 'lucide-react';
 
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 export const OrdersPage: React.FC = () => {
   const { showToast } = useToast();
+  const { selectedShop, selectedShopId } = useAuth();
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
 
@@ -92,8 +94,12 @@ export const OrdersPage: React.FC = () => {
   };
 
   useEffect(() => {
+    setPage(1);
+  }, [selectedShopId]);
+
+  useEffect(() => {
     loadOrders();
-  }, [search, statusFilter, paymentStatusFilter, page, limit]);
+  }, [search, statusFilter, paymentStatusFilter, page, limit, selectedShopId]);
 
   const currencySymbol = setting?.currencySymbol || '₹';
 
@@ -162,18 +168,33 @@ export const OrdersPage: React.FC = () => {
             title="Refresh Orders"
             className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-brand-600' : ''}`} />
           </button>
 
           <button
             onClick={() => navigate('/orders/new')}
-            className="px-4 py-2.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-extrabold text-xs shadow-md shadow-brand-600/30 flex items-center justify-center gap-2 active:scale-95 transition-all"
+            className="px-4 py-2.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-brand-600/20 active:scale-95 transition-all"
           >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <Plus className="w-4 h-4 stroke-[3]" />
             <span>New Order</span>
           </button>
         </div>
       </div>
+
+      {/* Branch Context Indicator */}
+      {selectedShop && (
+        <div className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-50 via-white to-brand-50 dark:from-indigo-950/40 dark:via-slate-900 dark:to-brand-950/40 border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-semibold text-slate-700 dark:text-slate-200">
+              Branch Orders: <strong className="text-indigo-600 dark:text-indigo-400">[{selectedShop.code}] {selectedShop.name}</strong> ({selectedShop.region})
+            </span>
+          </div>
+          <span className="text-[11px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+            {totalOrdersCount} orders found
+          </span>
+        </div>
+      )}
 
       {/* Filter & Search Controls */}
       <div className="glass-card p-4 space-y-3">

@@ -19,10 +19,13 @@ import {
   Calendar,
   Layers,
   Trash2,
+  Building2,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export const MachinePage: React.FC = () => {
   const { showToast } = useToast();
+  const { selectedShop, selectedShopId } = useAuth();
   const [activeTab, setActiveTab] = useState<'washer' | 'dryer' | 'analytics'>('washer');
 
   // Unified Date Filter State (today, month, year, custom)
@@ -103,7 +106,7 @@ export const MachinePage: React.FC = () => {
     setDryerPage(1);
     setCylinderPage(1);
     loadMachineData();
-  }, [dateFilter, startDate, endDate]);
+  }, [selectedShopId, dateFilter, startDate, endDate]);
 
   // Handle Washer Log Submit
   const handleLogWasher = async (e: React.FormEvent) => {
@@ -116,6 +119,7 @@ export const MachinePage: React.FC = () => {
         cyclesCount: 1,
         operatorName: washerForm.operatorName,
         notes: washerForm.notes,
+        shopId: selectedShopId !== 'all' ? selectedShopId : undefined,
       });
 
       if (res.success) {
@@ -139,6 +143,7 @@ export const MachinePage: React.FC = () => {
         cyclesCount: dryerForm.cyclesCount,
         operatorName: dryerForm.operatorName,
         notes: dryerForm.notes,
+        shopId: selectedShopId !== 'all' ? selectedShopId : undefined,
       });
 
       if (res.success) {
@@ -155,7 +160,10 @@ export const MachinePage: React.FC = () => {
   const handleLogCylinder = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await logGasCylinderApi(cylinderForm);
+      const res = await logGasCylinderApi({
+        ...cylinderForm,
+        shopId: selectedShopId !== 'all' ? selectedShopId : undefined,
+      });
       if (res.success) {
         showToast(res.message || 'LPG Gas Cylinder recorded!', 'success');
         setCylinderForm({
@@ -230,6 +238,17 @@ export const MachinePage: React.FC = () => {
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
         </button>
       </div>
+
+      {selectedShop && (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span>
+              Branch Machines & Utilities: <strong className="text-indigo-600 dark:text-indigo-400">[{selectedShop.code}] {selectedShop.name}</strong> ({selectedShop.region})
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Unified Date Filter Bar for All 3 Sections */}
       <div className="glass-card p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

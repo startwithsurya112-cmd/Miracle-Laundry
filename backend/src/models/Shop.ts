@@ -49,7 +49,6 @@ const ShopSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-ShopSchema.index({ code: 1 });
 ShopSchema.index({ region: 1 });
 ShopSchema.index({ isActive: 1 });
 
