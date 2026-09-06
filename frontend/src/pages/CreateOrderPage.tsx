@@ -152,10 +152,11 @@ export const CreateOrderPage: React.FC = () => {
         }
 
         if (itemRes.success && Array.isArray(itemRes.items) && itemRes.items.length > 0) {
-          const priceMap = new Map<string, { price: number; name: string }>();
+          const priceMap = new Map<string, { price: number; name: string; servicePrices?: Record<string, number> }>();
           itemRes.items.forEach((i: any) => {
-            if (i._id) priceMap.set(i._id, { price: i.defaultPrice, name: i.name });
-            if (i.name) priceMap.set(i.name.toLowerCase(), { price: i.defaultPrice, name: i.name });
+            const info = { price: i.defaultPrice, name: i.name, servicePrices: i.servicePrices };
+            if (i._id) priceMap.set(i._id, info);
+            if (i.name) priceMap.set(i.name.toLowerCase(), info);
           });
 
           const synced = posGroupCatalog.map((grp) => ({
@@ -169,6 +170,7 @@ export const CreateOrderPage: React.FC = () => {
                     ...item,
                     name: match.name || item.name,
                     price: match.price !== undefined ? match.price : item.price,
+                    servicePrices: match.servicePrices,
                   };
                 }
                 return item;

@@ -3,6 +3,7 @@ export interface POSCatalogItem {
   name: string;
   price: number;
   subCategory: string;
+  servicePrices?: Record<string, number>;
 }
 
 export interface POSGroup {
@@ -43,7 +44,20 @@ export const kgServicesList: KgServiceRate[] = [
  * Dynamic Service-Based Pricing Calculator
  * Returns the exact unit price for a garment item depending on the selected Service Category
  */
-export const getItemPriceForService = (item: { name: string; price: number; category?: string }, serviceName: string): number => {
+export const getItemPriceForService = (
+  item: { name: string; price: number; category?: string; servicePrices?: Record<string, number> },
+  serviceName: string
+): number => {
+  // 1. If explicit service price is mapped for this item and service, always use it
+  if (
+    item.servicePrices &&
+    item.servicePrices[serviceName] !== undefined &&
+    item.servicePrices[serviceName] !== null &&
+    !isNaN(Number(item.servicePrices[serviceName]))
+  ) {
+    return Number(item.servicePrices[serviceName]);
+  }
+
   const name = item.name.toLowerCase();
   const base = item.price && item.price > 0 ? item.price : 15;
 

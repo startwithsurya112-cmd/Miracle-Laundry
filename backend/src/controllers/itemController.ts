@@ -102,17 +102,27 @@ export const getItems = async (req: Request, res: Response) => {
 
 export const createItem = async (req: Request, res: Response) => {
   try {
-    const { name, defaultPrice, category, icon, isActive } = req.body;
+    const { name, defaultPrice, category, icon, isActive, serviceName, servicePrices } = req.body;
 
     if (!name || defaultPrice === undefined) {
       return res.status(400).json({ success: false, message: 'Item name and default price are required' });
     }
 
+    const priceNum = Number(defaultPrice);
+    const initialServicePrices = servicePrices && typeof servicePrices === 'object' ? { ...servicePrices } : {};
+    if (serviceName) {
+      initialServicePrices[serviceName] = priceNum;
+    }
+    if (initialServicePrices['Wash and Fold'] === undefined) {
+      initialServicePrices['Wash and Fold'] = priceNum;
+    }
+
     const item = new LaundryItem({
       name,
-      defaultPrice: Number(defaultPrice),
+      defaultPrice: priceNum,
       category: category || 'Regular',
       icon: icon || 'Shirt',
+      servicePrices: initialServicePrices,
       isActive: isActive !== undefined ? isActive : true,
     });
 
@@ -126,7 +136,7 @@ export const createItem = async (req: Request, res: Response) => {
 
 export const updateItem = async (req: Request, res: Response) => {
   try {
-    const { name, defaultPrice, category, icon, isActive } = req.body;
+    const { name, defaultPrice, category, icon, isActive, serviceName, servicePrices } = req.body;
     const item = await LaundryItem.findById(req.params.id);
 
     if (!item) {
@@ -134,10 +144,32 @@ export const updateItem = async (req: Request, res: Response) => {
     }
 
     if (name) item.name = name;
-    if (defaultPrice !== undefined) item.defaultPrice = Number(defaultPrice);
     if (category) item.category = category;
     if (icon) item.icon = icon;
     if (isActive !== undefined) item.isActive = isActive;
+
+    const currentPrices = (item.servicePrices && typeof item.servicePrices === 'object') ? { ...item.servicePrices } : {};
+
+    if (servicePrices && typeof servicePrices === 'object') {
+      Object.assign(currentPrices, servicePrices);
+    }
+
+    if (serviceName && defaultPrice !== undefined) {
+      const priceNum = Number(defaultPrice);
+      currentPrices[serviceName] = priceNum;
+      // If service is 'Wash and Fold' or base defaultPrice not set, update base defaultPrice
+      if (serviceName === 'Wash and Fold' || item.defaultPrice === undefined) {
+        item.defaultPrice = priceNum;
+      }
+    } else if (defaultPrice !== undefined) {
+      item.defaultPrice = Number(defaultPrice);
+      if (currentPrices['Wash and Fold'] === undefined) {
+        currentPrices['Wash and Fold'] = Number(defaultPrice);
+      }
+    }
+
+    item.servicePrices = currentPrices;
+    item.markModified('servicePrices');
 
     await item.save();
 

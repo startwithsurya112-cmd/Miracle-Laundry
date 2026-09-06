@@ -83,28 +83,75 @@ export const ItemsPage: React.FC = () => {
   };
 
   const handleOpenEdit = (item: LaundryItem) => {
+    const activePrice = getItemPriceForService(
+      {
+        name: item.name,
+        price: item.defaultPrice,
+        category: item.category,
+        servicePrices: item.servicePrices,
+      },
+      selectedService
+    );
     setEditingItem(item);
     setFormData({
       name: item.name,
-      defaultPrice: item.defaultPrice,
+      defaultPrice: activePrice,
       category: item.category || 'Regular',
-      serviceName: selectedService || 'Wash and Fold',
+      serviceName: selectedService,
       icon: item.icon || 'Shirt',
       isActive: item.isActive,
     });
     setShowModal(true);
   };
 
+  const handleModalServiceChange = (newService: string) => {
+    if (editingItem) {
+      const priceForService = getItemPriceForService(
+        {
+          name: editingItem.name,
+          price: editingItem.defaultPrice,
+          category: editingItem.category,
+          servicePrices: editingItem.servicePrices,
+        },
+        newService
+      );
+      setFormData((prev) => ({
+        ...prev,
+        serviceName: newService,
+        defaultPrice: priceForService,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        serviceName: newService,
+      }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       if (editingItem) {
-        await updateItemApi(editingItem._id, formData);
+        await updateItemApi(editingItem._id, {
+          name: formData.name,
+          category: formData.category,
+          serviceName: formData.serviceName,
+          defaultPrice: Number(formData.defaultPrice),
+          icon: formData.icon,
+          isActive: formData.isActive,
+        });
       } else {
-        await createItemApi(formData);
+        await createItemApi({
+          name: formData.name,
+          category: formData.category,
+          serviceName: formData.serviceName,
+          defaultPrice: Number(formData.defaultPrice),
+          icon: formData.icon,
+          isActive: formData.isActive,
+        });
       }
       setShowModal(false);
-      loadData();
+      await loadData();
     } catch (err: any) {
       alert(err.message || 'Failed to save laundry item');
     }
@@ -266,7 +313,12 @@ export const ItemsPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredItems.map((item) => {
             const activeServicePrice = getItemPriceForService(
-              { name: item.name, price: item.defaultPrice, category: item.category },
+              {
+                name: item.name,
+                price: item.defaultPrice,
+                category: item.category,
+                servicePrices: item.servicePrices,
+              },
               selectedService
             );
             return (
@@ -324,7 +376,7 @@ export const ItemsPage: React.FC = () => {
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4">
             <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
               <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                {editingItem ? 'Edit Laundry Item & Base Rate' : 'Add New Laundry Item'}
+                {editingItem ? `Edit Price for ${formData.serviceName} - ${editingItem.name}` : 'Add New Laundry Item'}
               </h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
@@ -370,7 +422,7 @@ export const ItemsPage: React.FC = () => {
                   </label>
                   <select
                     value={formData.serviceName}
-                    onChange={(e) => setFormData({ ...formData, serviceName: e.target.value })}
+                    onChange={(e) => handleModalServiceChange(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-bold text-brand-600"
                   >
                     {mainServicesList.map((srv) => (
@@ -395,6 +447,50 @@ export const ItemsPage: React.FC = () => {
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-bold text-emerald-600"
                 />
               </div>
+
+              {/* Service Rates Overview for this Item */}
+              {editingItem && (
+                <div className="pt-2">
+                  <span className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">
+                    All Service Rates for {editingItem.name} (Click to Switch & Edit)
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
+                    {mainServicesList.map((srv) => {
+                      const price = getItemPriceForService(
+                        {
+                          name: editingItem.name,
+                          price: editingItem.defaultPrice,
+                          category: editingItem.category,
+                          servicePrices: editingItem.servicePrices,
+                        },
+                        srv
+                      );
+                      const isCurrent = formData.serviceName === srv;
+                      return (
+                        <button
+                          key={srv}
+                          type="button"
+                          onClick={() => handleModalServiceChange(srv)}
+                          className={`p-1.5 rounded-lg text-left text-[11px] transition-all flex items-center justify-between ${
+                            isCurrent
+                              ? 'bg-brand-600 text-white font-bold shadow-xs'
+                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          <span className="truncate pr-1">{srv}</span>
+                          <span
+                            className={`font-black shrink-0 ${
+                              isCurrent ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'
+                            }`}
+                          >
+                            {currencySymbol}{price}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2 flex gap-3">
                 <button

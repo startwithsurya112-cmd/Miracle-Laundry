@@ -6,6 +6,7 @@ export interface ILaundryItem extends Document {
   defaultPrice: number;
   category: string; // Clothes, Household, Dry Clean, Accessories, etc.
   icon?: string;
+  servicePrices?: Record<string, number>;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -18,6 +19,7 @@ const LaundryItemSchema: Schema = new Schema(
     defaultPrice: { type: Number, required: true, min: 0 },
     category: { type: String, required: true, trim: true, default: 'Clothes' },
     icon: { type: String, default: 'Shirt' },
+    servicePrices: { type: Schema.Types.Mixed, default: {} },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

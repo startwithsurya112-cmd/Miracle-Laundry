@@ -392,9 +392,14 @@ export const createItemApi = async (itemData: any) => {
       body: JSON.stringify(itemData),
     });
   } catch (err) {
+    const initialServicePrices = itemData.servicePrices ? { ...itemData.servicePrices } : {};
+    if (itemData.serviceName && itemData.defaultPrice !== undefined) {
+      initialServicePrices[itemData.serviceName] = Number(itemData.defaultPrice);
+    }
     const newItem: LaundryItem = {
       _id: 'item-' + Date.now(),
       ...itemData,
+      servicePrices: initialServicePrices,
       isActive: true,
     };
     const current = getMockItems();
@@ -414,7 +419,15 @@ export const updateItemApi = async (id: string, itemData: any) => {
     const current = getMockItems();
     const idx = current.findIndex((i) => i._id === id);
     if (idx !== -1) {
-      current[idx] = { ...current[idx], ...itemData };
+      const currentServicePrices = current[idx].servicePrices ? { ...current[idx].servicePrices } : {};
+      if (itemData.serviceName && itemData.defaultPrice !== undefined) {
+        currentServicePrices[itemData.serviceName] = Number(itemData.defaultPrice);
+      }
+      current[idx] = {
+        ...current[idx],
+        ...itemData,
+        servicePrices: currentServicePrices,
+      };
       saveMockItems(current);
     }
     return { success: true, item: current[idx] };

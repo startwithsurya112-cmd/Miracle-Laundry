@@ -103,6 +103,7 @@ export interface LaundryItem {
   defaultPrice: number;
   category: string;
   icon?: string;
+  servicePrices?: Record<string, number>;
   isActive: boolean;
   createdAt?: string;
 }
