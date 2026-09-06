@@ -649,12 +649,54 @@ export const createOrderApi = async (orderData: any) => {
       paymentStatus = 'Partially Paid';
     }
 
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const orderNum = `ORD-${dateStr}-` + String(orders.length + 1).padStart(4, '0');
+    // Determine assigned shop for branch-separated order numbering
+    const currentShopId = orderData.shopId || localStorage.getItem('selected_shop_id') || 'shop-main';
+    let prefix = 'ORD-';
+    try {
+      const storedShop = localStorage.getItem('active_shop_info');
+      if (storedShop) {
+        const parsed = JSON.parse(storedShop);
+        if (parsed?.invoicePrefix) {
+          prefix = parsed.invoicePrefix.trim();
+        } else if (parsed?.code) {
+          prefix = parsed.code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        }
+      }
+    } catch (e) {}
+
+    if (!prefix.endsWith('-') && !prefix.endsWith('/')) {
+      prefix = `${prefix}-`;
+    }
+
+    // Filter orders belonging to this branch
+    const branchOrders = orders.filter((o) => (o.shopId || 'shop-main') === currentShopId);
+    let maxNum = 0;
+    branchOrders.forEach((o) => {
+      if (o.orderNumber) {
+        const withoutYear = o.orderNumber.trim().replace(/\/\d+$/, '');
+        const match = withoutYear.match(/(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
+        }
+      }
+    });
+
+    const nextNum = maxNum > 0 ? maxNum + 1 : 1;
+    const currentYearSuffix = new Date().getFullYear().toString().slice(-2);
+    let orderNum = `${prefix}${String(nextNum).padStart(3, '0')}/${currentYearSuffix}`;
+
+    while (orders.some((o) => o.orderNumber === orderNum)) {
+      maxNum++;
+      orderNum = `${prefix}${String(maxNum + 1).padStart(3, '0')}/${currentYearSuffix}`;
+    }
 
     const newOrd: Order = {
       _id: 'ord-' + Date.now(),
       orderNumber: orderNum,
+      shopId: currentShopId,
       customer: orderData.customerId || 'cust-1',
       customerSnapshot: {
         name: customerName,
