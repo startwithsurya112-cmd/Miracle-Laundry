@@ -221,26 +221,34 @@ export const updateShop = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// DELETE / Deactivate shop
+// DELETE / Permanently delete shop
 export const deleteShop = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { hardDelete } = req.query;
 
-    if (hardDelete === 'true') {
-      await Shop.findByIdAndDelete(id);
-      return res.json({ success: true, message: 'Shop permanently deleted' });
-    }
-
-    const shop = await Shop.findByIdAndUpdate(id, { isActive: false }, { new: true });
+    const shop = await Shop.findById(id);
     if (!shop) {
       return res.status(404).json({ success: false, message: 'Shop not found' });
     }
 
+    if (hardDelete === 'false') {
+      shop.isActive = false;
+      await shop.save();
+      return res.json({
+        success: true,
+        message: `Branch '${shop.name}' (${shop.code}) deactivated successfully`,
+        shop,
+      });
+    }
+
+    await Shop.findByIdAndDelete(id);
+    await Admin.updateMany({ shopId: id }, { $unset: { shopId: 1 } });
+    await Staff.updateMany({ shopId: id }, { $unset: { shopId: 1 } });
+
     res.json({
       success: true,
-      message: 'Shop deactivated successfully',
-      shop,
+      message: `Branch '${shop.name}' (${shop.code}) was deleted successfully`,
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });

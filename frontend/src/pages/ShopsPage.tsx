@@ -9,6 +9,7 @@ import {
   fetchShopOverviewApi,
 } from '../services/api';
 import { Shop } from '../types';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 import {
   Building2,
   Plus,
@@ -44,6 +45,8 @@ export const ShopsPage: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
+  const [deleteShopItem, setDeleteShopItem] = useState<Shop | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [formSubmitting, setFormSubmitting] = useState<boolean>(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -164,6 +167,26 @@ export const ShopsPage: React.FC = () => {
       await refreshShops();
     } catch (err: any) {
       alert(err.message || 'Failed to update status');
+    }
+  };
+
+  const handleDeleteShop = async () => {
+    if (!deleteShopItem) return;
+    setIsDeleting(true);
+    try {
+      const res = await deleteShopApi(deleteShopItem._id, true);
+      if (res.success) {
+        selectShop('all');
+        await loadData();
+        await refreshShops();
+        setDeleteShopItem(null);
+      } else {
+        alert(res.message || 'Failed to delete branch');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete branch');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -463,6 +486,13 @@ export const ShopsPage: React.FC = () => {
                   >
                     {shop.isActive ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                   </button>
+                  <button
+                    onClick={() => setDeleteShopItem(shop)}
+                    title="Delete Branch"
+                    className="p-2 rounded-xl border border-rose-200 dark:border-rose-900/60 text-rose-500 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/60 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -649,26 +679,59 @@ export const ShopsPage: React.FC = () => {
               </div>
 
               {/* Modal Footer */}
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formSubmitting}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-brand-600 hover:from-indigo-700 hover:to-brand-700 text-white text-xs font-bold shadow-md shadow-indigo-600/25 transition-all disabled:opacity-50"
-                >
-                  {formSubmitting ? 'Saving Branch...' : editingShop ? 'Update Branch' : 'Create Branch'}
-                </button>
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2.5">
+                {editingShop ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsModalOpen(false);
+                      setDeleteShopItem(editingShop);
+                    }}
+                    className="px-3.5 py-2 rounded-xl border border-rose-200 dark:border-rose-900/60 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Branch</span>
+                  </button>
+                ) : <div />}
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={formSubmitting}
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-brand-600 hover:from-indigo-700 hover:to-brand-700 text-white text-xs font-bold shadow-md shadow-indigo-600/25 transition-all disabled:opacity-50"
+                  >
+                    {formSubmitting ? 'Saving Branch...' : editingShop ? 'Update Branch' : 'Create Branch'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Delete Branch Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!deleteShopItem}
+        title="Delete Branch"
+        message={
+          deleteShopItem
+            ? `Are you sure you want to permanently delete branch "${deleteShopItem.name}" (${deleteShopItem.code})? This action cannot be undone.`
+            : ''
+        }
+        confirmText={isDeleting ? 'Deleting...' : 'Delete Branch'}
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={handleDeleteShop}
+        onCancel={() => setDeleteShopItem(null)}
+      />
     </div>
   );
 };

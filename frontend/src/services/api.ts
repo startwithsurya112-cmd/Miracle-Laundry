@@ -1663,7 +1663,7 @@ export const updateShopApi = async (id: string, shopData: Partial<Shop>): Promis
   });
 };
 
-export const deleteShopApi = async (id: string, hardDelete = false): Promise<{ success: boolean; message: string }> => {
+export const deleteShopApi = async (id: string, hardDelete = true): Promise<{ success: boolean; message: string }> => {
   clearApiCache();
   return fetchApi(`/shops/${id}?hardDelete=${hardDelete}`, {
     method: 'DELETE',
