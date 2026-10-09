@@ -83,7 +83,7 @@ export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
   const loadData = async () => {
-    if (!stats) setIsLoading(true);
+    setIsLoading(true);
     try {
       const [dashRes, setRes] = await Promise.all([
         fetchDashboardStats({
@@ -137,7 +137,11 @@ export const DashboardPage: React.FC = () => {
   useEffect(() => {
     loadData();
     setDashPage(1);
-  }, [preset, paymentStatus, orderStatus, dateType, dateFrom, dateTo, activeCard]);
+  }, [preset, paymentStatus, orderStatus, dateType, dateFrom, dateTo]);
+
+  useEffect(() => {
+    setDashPage(1);
+  }, [activeCard]);
 
   const currencySymbol = setting?.currencySymbol || '₹';
 
@@ -273,7 +277,11 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* COLLAPSIBLE DASHBOARD FILTERS ACCORDION (Sits right at top on Desktop) */}
-      <div className="glass-card p-3 sm:p-5 border-l-4 border-l-brand-600 space-y-2.5">
+      <div className="glass-card p-3 sm:p-5 border-l-4 border-l-brand-600 space-y-2.5 relative overflow-hidden">
+        {/* Animated Loading Bar across the top of Filter Card */}
+        {isLoading && (
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand-500 via-cyan-400 to-brand-600 animate-pulse" />
+        )}
         {/* Header Summary & Toggle Bar */}
         <div className="flex flex-row justify-between items-center gap-2">
           <div className="flex items-center gap-2 overflow-hidden">
@@ -281,8 +289,10 @@ export const DashboardPage: React.FC = () => {
             <h2 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
               Filters
             </h2>
-            <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300 font-bold text-[10px] border border-brand-200 truncate">
-              {dateFrom || dateTo ? 'Custom' : activePresetLabel}
+            <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300 font-bold text-[10px] border border-brand-200 truncate flex items-center gap-1.5">
+              {isLoading && <RefreshCw className="w-2.5 h-2.5 animate-spin text-brand-600 shrink-0" />}
+              <span>{dateFrom || dateTo ? 'Custom' : activePresetLabel}</span>
+              {isLoading && <span className="text-[9px] font-semibold text-brand-600 animate-pulse">(Updating...)</span>}
             </span>
           </div>
 
@@ -345,13 +355,14 @@ export const DashboardPage: React.FC = () => {
                     <button
                       key={p.id}
                       onClick={() => handlePresetSelect(p.id)}
-                      className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all ${
+                      className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
                         active
-                          ? 'bg-brand-600 text-white shadow-sm'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          ? 'bg-brand-600 text-white shadow-sm ring-1 ring-brand-700'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                       }`}
                     >
-                      {p.label}
+                      {active && isLoading && <RefreshCw className="w-2.5 h-2.5 animate-spin text-white shrink-0" />}
+                      <span>{p.label}</span>
                     </button>
                   );
                 })}
@@ -621,11 +632,14 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* DYNAMIC CONTENT CONTAINER (SWITCHES BASED ON SELECTED CARD) */}
-      <div className="glass-card p-4 sm:p-6 border-t-4 border-t-brand-600 space-y-4">
+      <div className="glass-card p-4 sm:p-6 border-t-4 border-t-brand-600 space-y-4 relative overflow-hidden">
+        {isLoading && (
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-brand-500 via-cyan-400 to-brand-600 animate-pulse" />
+        )}
         {/* CONTAINER HEADER TITLE */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
           <div>
-            <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white flex items-center gap-2">
+            <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
               {activeCard === 'orders' && <ShoppingBag className="w-4 h-4 text-blue-500" />}
               {activeCard === 'payments' && <DollarSign className="w-4 h-4 text-emerald-500" />}
               {activeCard === 'active' && <WashingMachine className="w-4 h-4 text-cyan-500" />}
@@ -643,6 +657,13 @@ export const DashboardPage: React.FC = () => {
                 {activeCard === 'customers' && `Customers (${totalDashRecords})`}
                 {activeCard === 'overdue' && `Overdue Orders (${totalDashRecords})`}
               </span>
+
+              {isLoading && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300 text-[10px] font-bold border border-brand-200 animate-pulse">
+                  <RefreshCw className="w-2.5 h-2.5 animate-spin text-brand-600" />
+                  Updating records...
+                </span>
+              )}
             </h3>
             <p className="hidden sm:block text-xs text-slate-500 mt-0.5">
               {activeCard === 'orders' && 'Showing all orders matching filter criteria.'}
