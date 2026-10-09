@@ -218,7 +218,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, setting, onClos
                   <span>{setting?.phone || '+91 98765 43210'}</span>
                   <span className="text-slate-300">•</span>
                   <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="break-all">{setting?.email || 'contact@intelligentlaundry.com'}</span>
+                  <span className="break-all">{setting?.email || 'contact@miraclelaundry.com'}</span>
                 </p>
                 {setting?.gstNumber && (
                   <p className="text-[11px] font-bold text-slate-700 pt-0.5">
@@ -289,10 +289,18 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, setting, onClos
                       </td>
                       <td className="py-2.5 px-3 text-center font-bold text-slate-800">{item.quantity}</td>
                       <td className="py-2.5 px-3 text-right text-slate-700 font-medium">
-                        {currencySymbol}{item.unitPrice}
+                        {item.unitPrice === 0 ? (
+                          <span className="text-emerald-700 font-bold text-[11px]">In Kg Pack</span>
+                        ) : (
+                          `${currencySymbol}${item.unitPrice}`
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-right font-extrabold text-slate-900">
-                        {currencySymbol}{item.subtotal}
+                        {item.subtotal === 0 ? (
+                          <span className="text-slate-400 font-normal text-[11px]">-</span>
+                        ) : (
+                          `${currencySymbol}${item.subtotal}`
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -308,11 +316,13 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, setting, onClos
                     <p className="font-bold text-slate-900">{item.itemName}</p>
                     <p className="text-[11px] text-brand-600 font-semibold">{item.serviceName}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      {item.quantity} × {currencySymbol}{item.unitPrice}
+                      {item.quantity} {item.unitPrice === 0 ? '(In Kg Pack)' : `× ${currencySymbol}${item.unitPrice}`}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-extrabold text-sm text-slate-900">{currencySymbol}{item.subtotal}</p>
+                    <p className="font-extrabold text-sm text-slate-900">
+                      {item.subtotal === 0 ? '-' : `${currencySymbol}${item.subtotal}`}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -369,7 +379,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, setting, onClos
           {/* Footer Terms & Thank You */}
           <div className="mt-6 pt-4 border-t border-dashed border-slate-200 text-[10px] text-slate-500 text-center leading-relaxed">
             <p className="font-bold text-slate-800 mb-1.5 text-xs">
-              Thank you for choosing {setting?.shopName || 'IntelligentLaundry'}!
+              Thank you for choosing {setting?.shopName || 'Miracle Laundry'}!
             </p>
             <div className="space-y-1 text-slate-600 font-semibold max-w-md mx-auto bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-left sm:text-center">
               <p>1. Please inspect clothes upon delivery.</p>

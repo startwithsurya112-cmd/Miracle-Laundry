@@ -38,26 +38,11 @@ import {
   Zap,
   AlertCircle,
   RefreshCw,
-  Building2,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 
 export const CreateOrderPage: React.FC = () => {
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const { isSuperAdmin, shops, selectedShop, selectedShopId, selectShop } = useAuth();
-
-  const [selectedOrderShopId, setSelectedOrderShopId] = useState<string>('');
-
-  const effectiveShopId =
-    selectedShopId !== 'all'
-      ? selectedShopId
-      : selectedOrderShopId || (shops.length > 0 ? shops[0]._id : '');
-
-  const activeOrderShop =
-    shops.find((s) => s._id === effectiveShopId) ||
-    selectedShop ||
-    (shops.length > 0 ? shops[0] : null);
 
   // Master State
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -84,6 +69,7 @@ export const CreateOrderPage: React.FC = () => {
 
   // 3. Kg Mode Selected Service (Default: 'Wash & Iron', Rate: 120)
   const [selectedKgService, setSelectedKgService] = useState<KgServiceRate>(kgServicesList[0]);
+  const [kgWeight, setKgWeight] = useState<string>('1');
 
   // 4. Active Target Group (Default: 'Regular')
   const [activeGroup, setActiveGroup] = useState<'Regular' | 'Men' | 'Women' | 'Kids' | 'Household' | 'Others'>('Regular');
@@ -105,7 +91,6 @@ export const CreateOrderPage: React.FC = () => {
       unitPrice: number;
       subtotal: number;
       isKgMode?: boolean;
-      isKgPackItem?: boolean;
     }>
   >([]);
 
@@ -125,38 +110,25 @@ export const CreateOrderPage: React.FC = () => {
   const [activeCatalog, setActiveCatalog] = useState<POSGroup[]>(posGroupCatalog);
 
   useEffect(() => {
-    const loadCustomersList = async () => {
-      try {
-        const custRes = await fetchCustomers({ limit: 500 });
-        if (custRes && custRes.success) {
-          setCustomers(custRes.customers || []);
-        }
-      } catch (err) {
-        console.error('Failed to load customers for POS', err);
-      }
-    };
-    loadCustomersList();
-  }, [effectiveShopId]);
-
-  useEffect(() => {
     const loadInitial = async () => {
       try {
-        const [setRes, itemRes] = await Promise.all([
+        const [custRes, setRes, itemRes] = await Promise.all([
+          fetchCustomers({ limit: 1000 }),
           fetchSettings(),
           fetchItems(),
         ]);
 
+        if (custRes.success) setCustomers(custRes.customers);
         if (setRes.success) {
           setSetting(setRes.setting);
           setTaxPercent(0);
         }
 
         if (itemRes.success && Array.isArray(itemRes.items) && itemRes.items.length > 0) {
-          const priceMap = new Map<string, { price: number; name: string; servicePrices?: Record<string, number> }>();
+          const priceMap = new Map<string, { price: number; name: string }>();
           itemRes.items.forEach((i: any) => {
-            const info = { price: i.defaultPrice, name: i.name, servicePrices: i.servicePrices };
-            if (i._id) priceMap.set(i._id, info);
-            if (i.name) priceMap.set(i.name.toLowerCase(), info);
+            if (i._id) priceMap.set(i._id, { price: i.defaultPrice, name: i.name });
+            if (i.name) priceMap.set(i.name.toLowerCase(), { price: i.defaultPrice, name: i.name });
           });
 
           const synced = posGroupCatalog.map((grp) => ({
@@ -170,7 +142,6 @@ export const CreateOrderPage: React.FC = () => {
                     ...item,
                     name: match.name || item.name,
                     price: match.price !== undefined ? match.price : item.price,
-                    servicePrices: match.servicePrices,
                   };
                 }
                 return item;
@@ -186,50 +157,29 @@ export const CreateOrderPage: React.FC = () => {
     loadInitial();
   }, []);
 
-  const currencySymbol = setting?.currencySymbol || '₹';
+  // Live Backend Customer Search when typing in customerSearch box
+  useEffect(() => {
+    if (!customerSearch.trim()) return;
 
-  // Switch or Select Kg Service Rate Category
-  const handleSelectKgService = (kgServ: KgServiceRate) => {
-    setSelectedKgService(kgServ);
-    setOrderItems((prev) => {
-      const kgLineIdx = prev.findIndex((l) => l.isKgMode);
-      if (kgLineIdx === -1) {
-        return [
-          {
-            itemId: `kg-${Date.now()}`,
-            itemName: `Bulk Laundry - ${kgServ.name} (1 Kg @ ${currencySymbol}${kgServ.ratePerKg}/Kg)`,
-            serviceId: 'service-kg',
-            serviceName: kgServ.name,
-            quantity: 1,
-            unitPrice: kgServ.ratePerKg,
-            subtotal: kgServ.ratePerKg,
-            isKgMode: true,
-          },
-          ...prev,
-        ];
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetchCustomers({ search: customerSearch.trim(), limit: 100 });
+        if (res.success && Array.isArray(res.customers)) {
+          setCustomers((prev) => {
+            const existingIds = new Set(prev.map((c) => c._id));
+            const newCustomers = res.customers.filter((c: Customer) => !existingIds.has(c._id));
+            return [...newCustomers, ...prev];
+          });
+        }
+      } catch (err) {
+        console.error('Failed to search customers live', err);
       }
-      return prev.map((line) => {
-        if (line.isKgMode) {
-          const currentQty = line.quantity || 1;
-          return {
-            ...line,
-            serviceName: kgServ.name,
-            unitPrice: kgServ.ratePerKg,
-            subtotal: Math.round(currentQty * kgServ.ratePerKg),
-            itemName: `Bulk Laundry - ${kgServ.name} (${currentQty} Kg @ ${currencySymbol}${kgServ.ratePerKg}/Kg)`,
-          };
-        }
-        if (line.isKgPackItem) {
-          return {
-            ...line,
-            serviceName: `${kgServ.name} (Kg Pack)`,
-            serviceId: `${kgServ.name.toLowerCase().replace(/\s+/g, '-')}-pack`,
-          };
-        }
-        return line;
-      });
-    });
-  };
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
+
+  const currencySymbol = setting?.currencySymbol || '₹';
 
   // Add Item to Cart (Clicking Card in Quantity or Kg mode)
   const handleCardClick = (item: POSCatalogItem) => {
@@ -239,13 +189,13 @@ export const CreateOrderPage: React.FC = () => {
 
       setOrderItems((prev) => {
         const existingIdx = prev.findIndex(
-          (line) => line.itemId === item.id && line.serviceName === serviceName && !line.isKgPackItem
+          (line) => line.itemId === item.id && line.serviceName === serviceName && !line.isKgMode
         );
         if (existingIdx !== -1) {
           const updated = [...prev];
           const newQty = updated[existingIdx].quantity + 1;
           updated[existingIdx].quantity = newQty;
-          updated[existingIdx].subtotal = Math.round(newQty * updated[existingIdx].unitPrice);
+          updated[existingIdx].subtotal = newQty * updated[existingIdx].unitPrice;
           return updated;
         }
         return [
@@ -262,131 +212,141 @@ export const CreateOrderPage: React.FC = () => {
         ];
       });
     } else {
-      // By Weight (Kg) Mode:
-      // Bill is generated as Kg only (Bulk Laundry line item at kg rate).
-      // Each clicked garment item is listed as part of the Kg package at ₹0.
+      // ORDER MODE === 'kg'
+      const serviceName = selectedKgService.name;
+      const serviceId = selectedKgService.id || serviceName.toLowerCase().replace(/\s+/g, '-');
+
       setOrderItems((prev) => {
         let updated = [...prev];
-
-        // 1. Ensure the master Bulk Laundry Kg line item exists for this service
-        const kgLineIdx = updated.findIndex((l) => l.isKgMode);
-        if (kgLineIdx === -1) {
-          updated.unshift({
-            itemId: `kg-${Date.now()}`,
-            itemName: `Bulk Laundry - ${selectedKgService.name} (1 Kg @ ${currencySymbol}${selectedKgService.ratePerKg}/Kg)`,
-            serviceId: 'service-kg',
-            serviceName: selectedKgService.name,
+        // Ensure Bulk Kg charge line exists FOR THIS SPECIFIC SERVICE
+        const hasKgBulkLine = updated.some(
+          (line) => line.isKgMode && line.serviceName === serviceName
+        );
+        if (!hasKgBulkLine) {
+          const rateNum = selectedKgService.ratePerKg;
+          updated.push({
+            itemId: `kg-bulk-${serviceId}-${Date.now()}`,
+            itemName: `Bulk Laundry - ${serviceName} (1 Kg @ ${currencySymbol}${rateNum}/Kg)`,
+            serviceId: serviceId,
+            serviceName: serviceName,
             quantity: 1,
-            unitPrice: selectedKgService.ratePerKg,
-            subtotal: selectedKgService.ratePerKg,
+            unitPrice: rateNum,
+            subtotal: rateNum,
             isKgMode: true,
           });
-        } else if (updated[kgLineIdx].serviceName !== selectedKgService.name) {
-          const currentQty = updated[kgLineIdx].quantity || 1;
-          updated[kgLineIdx] = {
-            ...updated[kgLineIdx],
-            serviceName: selectedKgService.name,
-            unitPrice: selectedKgService.ratePerKg,
-            subtotal: Math.round(currentQty * selectedKgService.ratePerKg),
-            itemName: `Bulk Laundry - ${selectedKgService.name} (${currentQty} Kg @ ${currencySymbol}${selectedKgService.ratePerKg}/Kg)`,
-          };
         }
 
-        // 2. Add or increment the garment item under the Kg pack
-        const packServiceName = `${selectedKgService.name} (Kg Pack)`;
-        const garmentIdx = updated.findIndex(
-          (l) => l.itemId === item.id && l.isKgPackItem
+        const existingIdx = updated.findIndex(
+          (line) =>
+            line.itemId === item.id &&
+            !line.isKgMode &&
+            line.serviceName === `${serviceName} (Kg Pack)`
         );
 
-        if (garmentIdx !== -1) {
-          const newQty = updated[garmentIdx].quantity + 1;
-          updated[garmentIdx] = {
-            ...updated[garmentIdx],
+        if (existingIdx !== -1) {
+          const newQty = updated[existingIdx].quantity + 1;
+          updated[existingIdx] = {
+            ...updated[existingIdx],
             quantity: newQty,
-            subtotal: Math.round(newQty * updated[garmentIdx].unitPrice),
-          };
-        } else {
-          updated.push({
-            itemId: item.id,
-            itemName: item.name,
-            serviceId: `${selectedKgService.name.toLowerCase().replace(/\s+/g, '-')}-pack`,
-            serviceName: packServiceName,
-            quantity: 1,
-            unitPrice: 0,
             subtotal: 0,
-            isKgPackItem: true,
-          });
+          };
+          return updated;
         }
+
+        updated.push({
+          itemId: item.id,
+          itemName: item.name,
+          serviceId: serviceId,
+          serviceName: `${serviceName} (Kg Pack)`,
+          quantity: 1,
+          unitPrice: 0,
+          subtotal: 0,
+        });
 
         return updated;
       });
     }
   };
 
-  const updateItemQty = (index: number, newQty: number) => {
-    if (newQty <= 0) {
+  const updateItemQty = (index: number, newQty: number, options?: { isTyping?: boolean }) => {
+    if (newQty <= 0 && !options?.isTyping) {
       removeItem(index);
       return;
     }
     setOrderItems((prev) => {
       const updated = [...prev];
-      const line = updated[index];
-      const roundedQty = line.isKgMode ? Math.round(newQty * 10) / 10 : Math.round(newQty);
-      updated[index] = {
-        ...line,
-        quantity: roundedQty,
-        subtotal: Math.round(roundedQty * line.unitPrice),
-        itemName: line.isKgMode
-          ? `Bulk Laundry - ${line.serviceName} (${roundedQty} Kg @ ${currencySymbol}${line.unitPrice}/Kg)`
-          : line.itemName,
-      };
-      return updated;
-    });
-  };
+      const item = updated[index];
+      if (!item) return prev;
 
-  const updateItemQtyDirect = (index: number, newQty: number) => {
-    const validQty = isNaN(newQty) ? 0 : Math.max(0, newQty);
-    setOrderItems((prev) => {
-      const updated = [...prev];
-      const line = updated[index];
-      const roundedQty = line.isKgMode ? Math.round(validQty * 100) / 100 : Math.round(validQty);
-      updated[index] = {
-        ...line,
-        quantity: roundedQty,
-        subtotal: Math.round(roundedQty * line.unitPrice),
-        itemName: line.isKgMode
-          ? `Bulk Laundry - ${line.serviceName} (${roundedQty} Kg @ ${currencySymbol}${line.unitPrice}/Kg)`
-          : line.itemName,
-      };
+      const validQty = Math.max(0, isNaN(newQty) ? 0 : newQty);
+
+      if (item.isKgMode) {
+        const rateNum = item.unitPrice > 0 ? item.unitPrice : selectedKgService.ratePerKg;
+        const newSubtotal = Math.round(validQty * rateNum);
+        updated[index] = {
+          ...item,
+          quantity: validQty,
+          unitPrice: rateNum,
+          subtotal: newSubtotal,
+          itemName: `Bulk Laundry - ${item.serviceName} (${validQty} Kg @ ${currencySymbol}${rateNum}/Kg)`,
+        };
+      } else {
+        updated[index] = {
+          ...item,
+          quantity: validQty,
+          subtotal: Math.round(validQty * item.unitPrice),
+        };
+      }
       return updated;
     });
   };
 
   const updateItemPrice = (index: number, newPrice: number) => {
-    const validPrice = Math.max(0, isNaN(newPrice) ? 0 : newPrice);
     setOrderItems((prev) => {
       const updated = [...prev];
-      const line = updated[index];
-      updated[index] = {
-        ...line,
-        unitPrice: validPrice,
-        subtotal: Math.round(line.quantity * validPrice),
-        itemName: line.isKgMode
-          ? `Bulk Laundry - ${line.serviceName} (${line.quantity} Kg @ ${currencySymbol}${validPrice}/Kg)`
-          : line.itemName,
-      };
+      const item = updated[index];
+      const validPrice = Math.max(0, newPrice);
+      const sub = Math.round(item.quantity * validPrice);
+
+      if (item.isKgMode) {
+        updated[index] = {
+          ...item,
+          unitPrice: validPrice,
+          subtotal: sub,
+          itemName: `Bulk Laundry - ${item.serviceName} (${item.quantity} Kg @ ${currencySymbol}${validPrice}/Kg)`,
+        };
+      } else {
+        updated[index] = {
+          ...item,
+          unitPrice: validPrice,
+          subtotal: sub,
+        };
+      }
       return updated;
     });
   };
 
   const updateItemSubtotal = (index: number, newSubtotal: number) => {
-    const validSubtotal = Math.max(0, isNaN(newSubtotal) ? 0 : newSubtotal);
     setOrderItems((prev) => {
       const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        subtotal: validSubtotal,
-      };
+      const item = updated[index];
+      const validSubtotal = Math.max(0, newSubtotal);
+      const computedUnitPrice = item.quantity > 0 ? Math.round(validSubtotal / item.quantity) : validSubtotal;
+
+      if (item.isKgMode) {
+        updated[index] = {
+          ...item,
+          unitPrice: computedUnitPrice,
+          subtotal: validSubtotal,
+          itemName: `Bulk Laundry - ${item.serviceName} (${item.quantity} Kg @ ${currencySymbol}${computedUnitPrice}/Kg)`,
+        };
+      } else {
+        updated[index] = {
+          ...item,
+          unitPrice: computedUnitPrice,
+          subtotal: validSubtotal,
+        };
+      }
       return updated;
     });
   };
@@ -406,12 +366,13 @@ export const CreateOrderPage: React.FC = () => {
         mobile: newCustMobile,
         address: newCustAddress || 'Local Address',
         email: newCustEmail,
-        shopId: effectiveShopId || undefined,
       });
       if (res.success && res.customer) {
         setCustomers((prev) => [res.customer, ...prev]);
         setSelectedCustomerId(res.customer._id);
         setShowNewCustModal(false);
+        setIsCustDropdownOpen(false);
+        setCustomerSearch('');
         setNewCustName('');
         setNewCustMobile('');
         setNewCustAddress('');
@@ -487,7 +448,6 @@ export const CreateOrderPage: React.FC = () => {
         advancePaid,
         paymentMethod: advancePaid > 0 ? paymentMethod : 'Pending',
         notes,
-        shopId: effectiveShopId || undefined,
       });
 
       if (res.success && res.order) {
@@ -530,63 +490,31 @@ export const CreateOrderPage: React.FC = () => {
     );
   }
 
-  const filteredCustomers = customers.filter(
-    (c) =>
-      c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-      c.mobile.includes(customerSearch)
-  );
+  const searchLower = customerSearch.trim().toLowerCase();
+  const searchDigits = searchLower.replace(/\D/g, '');
+
+  const filteredCustomers = customers.filter((c) => {
+    if (!searchLower) return true;
+    const nameStr = (c.name || '').toLowerCase();
+    const mobileStr = (c.mobile || '').toLowerCase();
+    const mobileDigits = mobileStr.replace(/\D/g, '');
+    const addressStr = (c.address || '').toLowerCase();
+    const emailStr = (c.email || '').toLowerCase();
+
+    const nameMatch = nameStr.includes(searchLower);
+    const mobileMatch =
+      mobileStr.includes(searchLower) ||
+      (searchDigits.length > 0 && mobileDigits.includes(searchDigits));
+    const addressMatch = addressStr.includes(searchLower);
+    const emailMatch = emailStr.includes(searchLower);
+
+    return nameMatch || mobileMatch || addressMatch || emailMatch;
+  });
 
   const selectedCustomerObj = customers.find((c) => c._id === selectedCustomerId);
 
   return (
     <div className="space-y-6 pb-20">
-      {/* Branch Context Banner / Selector */}
-      {isSuperAdmin ? (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 bg-indigo-50/90 dark:bg-indigo-950/40 border border-indigo-200/70 dark:border-indigo-800/50 rounded-2xl shadow-xs">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-            <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <span>Assigning Order to Branch:</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={effectiveShopId}
-              onChange={(e) => {
-                setSelectedOrderShopId(e.target.value);
-                if (selectedShopId !== 'all') {
-                  selectShop(e.target.value);
-                }
-              }}
-              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-xs outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              {shops.map((s) => (
-                <option key={s._id} value={s._id}>
-                  [{s.code}] {s.name} ({s.region})
-                </option>
-              ))}
-            </select>
-            {activeOrderShop && (
-              <span className="text-[11px] font-mono text-indigo-600 dark:text-indigo-400 bg-indigo-100/70 dark:bg-indigo-900/50 px-2.5 py-1 rounded-lg">
-                Prefix: {activeOrderShop.invoicePrefix}
-              </span>
-            )}
-          </div>
-        </div>
-      ) : (
-        selectedShop && (
-          <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-              <span>
-                Order Branch: <strong className="text-indigo-600 dark:text-indigo-400">[{selectedShop.code}] {selectedShop.name}</strong> ({selectedShop.region})
-              </span>
-            </div>
-            <span className="text-[11px] font-mono text-indigo-600 dark:text-indigo-400 bg-indigo-100/70 dark:bg-indigo-900/50 px-2 py-0.5 rounded">
-              Prefix: {selectedShop.invoicePrefix}
-            </span>
-          </div>
-        )
-      )}
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -613,26 +541,7 @@ export const CreateOrderPage: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => {
-              setOrderMode('kg');
-              setOrderItems((prev) => {
-                if (prev.length === 0) {
-                  return [
-                    {
-                      itemId: `kg-${Date.now()}`,
-                      itemName: `Bulk Laundry - ${selectedKgService.name} (1 Kg @ ${currencySymbol}${selectedKgService.ratePerKg}/Kg)`,
-                      serviceId: 'service-kg',
-                      serviceName: selectedKgService.name,
-                      quantity: 1,
-                      unitPrice: selectedKgService.ratePerKg,
-                      subtotal: selectedKgService.ratePerKg,
-                      isKgMode: true,
-                    },
-                  ];
-                }
-                return prev;
-              });
-            }}
+            onClick={() => setOrderMode('kg')}
             className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
               orderMode === 'kg'
                 ? 'bg-brand-600 text-white shadow-md'
@@ -687,7 +596,7 @@ export const CreateOrderPage: React.FC = () => {
               </div>
             ) : (
               <div className="relative space-y-2">
-                <div className="relative">
+                <div className="relative z-20">
                   <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                   <input
                     type="text"
@@ -702,48 +611,56 @@ export const CreateOrderPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Dropdown list - ONLY SHOWN WHEN CLICKED/FOCUSED OR SEARCHING */}
+                {/* Backdrop & Dropdown list */}
                 {isCustDropdownOpen && (
-                  <div className="absolute z-20 left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl shadow-xl">
-                    {filteredCustomers.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-slate-400">
-                        No matching customers found.{' '}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsCustDropdownOpen(false);
-                            setShowNewCustModal(true);
-                          }}
-                          className="text-brand-600 font-bold underline"
-                        >
-                          + Add New Customer
-                        </button>
-                      </div>
-                    ) : (
-                      filteredCustomers.slice(0, 10).map((cust) => (
-                        <button
-                          key={cust._id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCustomerId(cust._id);
-                            setIsCustDropdownOpen(false);
-                            setCustomerSearch('');
-                          }}
-                          className="w-full text-left p-3 hover:bg-brand-50/60 dark:hover:bg-slate-800 transition-colors flex justify-between items-center text-xs group"
-                        >
-                          <div>
-                            <p className="font-extrabold text-slate-900 dark:text-white group-hover:text-brand-600">
-                              {cust.name}
-                            </p>
-                            <p className="text-slate-500 text-[11px] font-medium">+91 {cust.mobile}</p>
-                          </div>
-                          <span className="text-[10px] px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold group-hover:bg-brand-600 group-hover:text-white transition-all">
-                            Select
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setIsCustDropdownOpen(false)}
+                    />
+                    <div className="absolute z-20 left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl shadow-xl">
+                      {filteredCustomers.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-slate-400">
+                          No matching customers found.{' '}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsCustDropdownOpen(false);
+                              setShowNewCustModal(true);
+                            }}
+                            className="text-brand-600 font-bold underline"
+                          >
+                            + Add New Customer
+                          </button>
+                        </div>
+                      ) : (
+                        filteredCustomers.slice(0, 50).map((cust) => (
+                          <button
+                            key={cust._id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCustomerId(cust._id);
+                              setIsCustDropdownOpen(false);
+                              setCustomerSearch('');
+                            }}
+                            className="w-full text-left p-3 hover:bg-brand-50/60 dark:hover:bg-slate-800 transition-colors flex justify-between items-center text-xs group"
+                          >
+                            <div>
+                              <p className="font-extrabold text-slate-900 dark:text-white group-hover:text-brand-600">
+                                {cust.name}
+                              </p>
+                              <p className="text-slate-500 text-[11px] font-medium">
+                                +91 {cust.mobile} {cust.address ? `• ${cust.address}` : ''}
+                              </p>
+                            </div>
+                            <span className="text-[10px] px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold group-hover:bg-brand-600 group-hover:text-white transition-all">
+                              Select
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -775,119 +692,137 @@ export const CreateOrderPage: React.FC = () => {
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {orderItems.map((line, idx) => (
-                  <div key={idx} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    {/* Item Details */}
-                    <div className="flex-1 min-w-[130px]">
-                      <p className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
-                        {line.itemName}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span
-                          className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                            line.isKgMode
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300'
-                              : line.isKgPackItem
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
-                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                          }`}
-                        >
-                          {line.serviceName}
-                        </span>
-                      </div>
+                  <div key={idx} className="py-3 flex items-center justify-between gap-2 text-xs">
+                    <div className="flex-1">
+                      <p className="font-bold text-slate-900 dark:text-white">{line.itemName}</p>
+                      <p className="text-[11px] font-semibold text-brand-600 dark:text-brand-400">{line.serviceName}</p>
                     </div>
 
-                    {/* Controls: Price, Qty/Weight Stepper, Total Subtotal, Delete */}
-                    <div className="flex items-center flex-wrap gap-2">
-                      {/* 1. Unit Price Input */}
-                      <div className="flex items-center gap-0.5 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <span className="text-slate-400 font-bold text-xs">{currencySymbol}</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={line.unitPrice}
-                          onChange={(e) => updateItemPrice(idx, parseFloat(e.target.value) || 0)}
-                          className="w-12 text-center font-bold text-xs bg-transparent outline-none text-slate-900 dark:text-white"
-                          title="Unit Price"
-                        />
-                        {line.isKgMode && (
-                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">/Kg</span>
-                        )}
-                        {line.isKgPackItem && (
-                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">(Kg Pack)</span>
-                        )}
-                      </div>
+                    {/* Unit Price Display or Editable */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-slate-400 font-bold">{currencySymbol}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={line.unitPrice}
+                        onChange={(e) => updateItemPrice(idx, Number(e.target.value))}
+                        className="w-16 px-1.5 py-1 text-center font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                      />
+                      {line.isKgMode ? (
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">/Kg</span>
+                      ) : line.unitPrice === 0 ? (
+                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                          (Kg Pack)
+                        </span>
+                      ) : null}
+                    </div>
 
-                      {/* 2. Quantity / Weight with Steppers */}
-                      <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200 dark:border-slate-700">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateItemQty(
-                              idx,
-                              line.isKgMode
-                                ? Math.max(0.5, Number((line.quantity - 1).toFixed(1)))
-                                : line.quantity - 1
-                            )
-                          }
-                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 shadow-xs"
-                          title="Decrease"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          step={line.isKgMode ? '0.1' : '1'}
-                          min="0.1"
-                          value={line.quantity}
-                          onChange={(e) => updateItemQtyDirect(idx, parseFloat(e.target.value))}
-                          className="w-10 text-center font-bold text-xs bg-transparent outline-none text-slate-900 dark:text-white"
-                          title="Quantity or Weight in Kg"
-                        />
-                        {line.isKgMode && (
-                          <span className="text-[10px] font-extrabold text-slate-600 dark:text-slate-300 pr-1">
-                            Kg
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateItemQty(
-                              idx,
-                              line.isKgMode
-                                ? Number((line.quantity + 1).toFixed(1))
-                                : line.quantity + 1
-                            )
-                          }
-                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 shadow-xs"
-                          title="Increase"
-                        >
-                          +
-                        </button>
-                      </div>
-
-                      {/* 3. Subtotal Input */}
-                      <div className="flex items-center gap-0.5 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <span className="text-slate-400 font-bold text-xs">{currencySymbol}</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={line.subtotal}
-                          onChange={(e) => updateItemSubtotal(idx, parseFloat(e.target.value) || 0)}
-                          className="w-14 text-center font-black text-xs bg-transparent outline-none text-slate-900 dark:text-white"
-                          title="Item Subtotal"
-                        />
-                      </div>
-
-                      {/* 4. Delete Item */}
+                    {/* Qty Stepper (Works for BOTH items and Kg Bulk line!) */}
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
                       <button
                         type="button"
-                        onClick={() => removeItem(idx)}
-                        className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors shrink-0"
-                        title="Remove Item"
+                        onClick={() =>
+                          updateItemQty(
+                            idx,
+                            line.isKgMode
+                              ? Number(Math.max(0, line.quantity - 0.5).toFixed(1))
+                              : line.quantity - 1
+                          )
+                        }
+                        className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        -
+                      </button>
+                      {line.isKgMode ? (
+                        <div className="flex items-center">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={line.quantity === 0 ? '' : line.quantity}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const valStr = e.target.value;
+                              if (valStr === '') {
+                                updateItemQty(idx, 0, { isTyping: true });
+                              } else {
+                                const num = parseFloat(valStr);
+                                if (!isNaN(num)) {
+                                  updateItemQty(idx, num, { isTyping: true });
+                                }
+                              }
+                            }}
+                            onBlur={() => {
+                              if (!line.quantity || line.quantity <= 0) {
+                                updateItemQty(idx, 1);
+                              }
+                            }}
+                            className="w-14 text-center font-bold bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded px-1 py-0.5 border border-slate-200 dark:border-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          />
+                          <span className="text-[10px] font-bold text-slate-500 ml-1 pr-1">Kg</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center">
+                          <input
+                            type="number"
+                            min="0"
+                            value={line.quantity === 0 ? '' : line.quantity}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const valStr = e.target.value;
+                              if (valStr === '') {
+                                updateItemQty(idx, 0, { isTyping: true });
+                              } else {
+                                const num = parseInt(valStr, 10);
+                                if (!isNaN(num)) {
+                                  updateItemQty(idx, num, { isTyping: true });
+                                }
+                              }
+                            }}
+                            onBlur={() => {
+                              if (!line.quantity || line.quantity <= 0) {
+                                updateItemQty(idx, 1);
+                              }
+                            }}
+                            className="w-12 text-center font-bold bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded px-1 py-0.5 border border-slate-200 dark:border-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateItemQty(
+                            idx,
+                            line.isKgMode
+                              ? Number((line.quantity + 0.5).toFixed(1))
+                              : line.quantity + 1
+                          )
+                        }
+                        className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all"
+                      >
+                        +
                       </button>
                     </div>
+
+                    {/* Editable Line Subtotal */}
+                    <div className="flex items-center gap-0.5">
+                      <span className="text-slate-400 font-bold">{currencySymbol}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={line.subtotal}
+                        onChange={(e) => updateItemSubtotal(idx, Number(e.target.value))}
+                        className="w-16 px-1.5 py-1 text-center font-black rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removeItem(idx)}
+                      className="p-1 text-slate-400 hover:text-rose-500"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1190,7 +1125,7 @@ export const CreateOrderPage: React.FC = () => {
                     return (
                       <div
                         key={kgServ.name}
-                        onClick={() => handleSelectKgService(kgServ)}
+                        onClick={() => setSelectedKgService(kgServ)}
                         className={`p-3 rounded-2xl border cursor-pointer transition-all duration-150 select-none flex flex-col justify-between ${
                           active
                             ? 'bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-600/30'
@@ -1215,7 +1150,9 @@ export const CreateOrderPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Garment Items Selection for Selected Service */}
+
+
+              {/* 3. Target Group Garment Items Selection for Kg Mode */}
               <div className="pt-2 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="block text-xs font-extrabold uppercase tracking-wider text-slate-400">
@@ -1225,7 +1162,7 @@ export const CreateOrderPage: React.FC = () => {
 
                 {/* Target Group Tabs */}
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                  {activeCatalog.map((grp) => {
+                  {posGroupCatalog.map((grp) => {
                     const active = activeGroup === grp.groupName;
                     return (
                       <button
@@ -1302,11 +1239,16 @@ export const CreateOrderPage: React.FC = () => {
                           </div>
 
                           <div className="mt-2.5 flex items-center justify-between">
-                            <span className="font-black text-brand-600 dark:text-brand-400 group-hover:text-white text-xs">
-                              {currencySymbol}{item.price && item.price > 0 ? item.price : 15}
-                            </span>
+                            <div>
+                              <span className="font-black text-brand-600 dark:text-brand-400 group-hover:text-white text-xs">
+                                {currencySymbol}{getItemPriceForService(item, 'Wash and Fold')}
+                              </span>
+                              <span className="text-[9px] text-slate-400 group-hover:text-brand-100 block font-medium">
+                                Orig. Price
+                              </span>
+                            </div>
                             <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300 group-hover:bg-white/20 group-hover:text-white">
-                              Select
+                              + Add
                             </span>
                           </div>
                         </div>

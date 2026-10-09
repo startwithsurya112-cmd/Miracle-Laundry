@@ -23,7 +23,7 @@ export interface ISetting extends Document {
 const SettingSchema: Schema = new Schema(
   {
     shopName: { type: String, required: true, default: 'Miracle Laundry' },
-    shopTagline: { type: String, default: 'Smart & Premium Laundry Services' },
+    shopTagline: { type: String, default: 'Express & Premium Laundry Services' },
     logoUrl: { type: String, default: '/logo.jpg' },
     phone: { type: String, required: true, default: '+91 98765 43210' },
     email: { type: String, required: true, default: 'contact@miraclelaundry.com' },
@@ -32,7 +32,7 @@ const SettingSchema: Schema = new Schema(
     gstPercentage: { type: Number, default: 0 },
     currencySymbol: { type: String, default: '₹' },
     currencyCode: { type: String, default: 'INR' },
-    invoicePrefix: { type: String, default: 'ORD-' },
+    invoicePrefix: { type: String, default: 'ML-' },
     termsAndConditions: { type: String, default: 'Items not collected within 30 days are subject to storage charges. Please report any discrepancy within 24 hours of pickup.' },
     upiId: { type: String, default: '9876543210@paytm' },
     gpayNumber: { type: String, default: '9876543210' },

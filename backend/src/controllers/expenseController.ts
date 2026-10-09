@@ -2,11 +2,10 @@ import { Request, Response } from 'express';
 import Expense from '../models/Expense';
 import Payment from '../models/Payment';
 import Order from '../models/Order';
-import { AuthRequest } from '../middleware/auth';
 import { generateVoucherNumber } from '../utils/voucherNumberGenerator';
 
 // --- Shop Expenses Endpoints ---
-export const getExpenses = async (req: AuthRequest, res: Response) => {
+export const getExpenses = async (req: Request, res: Response) => {
   try {
     const { category, paymentMethod, search, dateFrom, dateTo, page = 1, limit = 20 } = req.query;
 
@@ -15,9 +14,6 @@ export const getExpenses = async (req: AuthRequest, res: Response) => {
     const skip = (pageNum - 1) * limitNum;
 
     let query: any = {};
-    if (req.targetShopId) {
-      query.shopId = req.targetShopId;
-    }
 
     if (category) query.category = category;
     if (paymentMethod) query.paymentMethod = paymentMethod;
@@ -70,9 +66,9 @@ export const getExpenses = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const createExpense = async (req: AuthRequest, res: Response) => {
+export const createExpense = async (req: Request, res: Response) => {
   try {
-    const { category, description, amount, paymentMethod, paidTo, expenseDate, notes, shopId } = req.body;
+    const { category, description, amount, paymentMethod, paidTo, expenseDate, notes } = req.body;
 
     if (!category || !description || amount === undefined) {
       return res.status(400).json({ success: false, message: 'Category, description, and valid amount are required' });
@@ -86,7 +82,6 @@ export const createExpense = async (req: AuthRequest, res: Response) => {
     const voucherNumber = await generateVoucherNumber();
 
     const expense = new Expense({
-      shopId: req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId,
       voucherNumber,
       category,
       description,
@@ -109,17 +104,13 @@ export const createExpense = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const updateExpense = async (req: AuthRequest, res: Response) => {
+export const updateExpense = async (req: Request, res: Response) => {
   try {
-    const { category, description, amount, paymentMethod, paidTo, expenseDate, notes, shopId } = req.body;
+    const { category, description, amount, paymentMethod, paidTo, expenseDate, notes } = req.body;
 
     const expense = await Expense.findById(req.params.id);
     if (!expense) {
       return res.status(404).json({ success: false, message: 'Expense record not found' });
-    }
-
-    if (req.user?.role !== 'super_admin' && req.targetShopId && expense.shopId && String(expense.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: this expense belongs to another branch.' });
     }
 
     if (category) expense.category = category;
@@ -129,7 +120,6 @@ export const updateExpense = async (req: AuthRequest, res: Response) => {
     if (paidTo !== undefined) expense.paidTo = paidTo;
     if (expenseDate) expense.expenseDate = new Date(expenseDate);
     if (notes !== undefined) expense.notes = notes;
-    if (shopId !== undefined && req.user?.role === 'super_admin') expense.shopId = shopId;
 
     await expense.save();
 
@@ -143,15 +133,11 @@ export const updateExpense = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const deleteExpense = async (req: AuthRequest, res: Response) => {
+export const deleteExpense = async (req: Request, res: Response) => {
   try {
     const expense = await Expense.findById(req.params.id);
     if (!expense) {
       return res.status(404).json({ success: false, message: 'Expense record not found' });
-    }
-
-    if (req.user?.role !== 'super_admin' && req.targetShopId && expense.shopId && String(expense.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: this expense belongs to another branch.' });
     }
 
     await Expense.findByIdAndDelete(req.params.id);
@@ -166,19 +152,13 @@ export const deleteExpense = async (req: AuthRequest, res: Response) => {
 };
 
 // --- Combined Order & Accounts Summary Endpoint ---
-export const getAccountsSummary = async (req: AuthRequest, res: Response) => {
+export const getAccountsSummary = async (req: Request, res: Response) => {
   try {
     const { dateFrom, dateTo, paymentMethod } = req.query;
 
     let paymentQuery: any = {};
     let orderQuery: any = {};
     let expenseQuery: any = {};
-
-    if (req.targetShopId) {
-      paymentQuery.shopId = req.targetShopId;
-      orderQuery.shopId = req.targetShopId;
-      expenseQuery.shopId = req.targetShopId;
-    }
 
     if (dateFrom || dateTo) {
       paymentQuery.paidAt = {};
@@ -208,45 +188,47 @@ export const getAccountsSummary = async (req: AuthRequest, res: Response) => {
     const orders = await Order.find(orderQuery).sort({ createdAt: -1 }).lean();
     const expenses = await Expense.find(expenseQuery).sort({ expenseDate: -1 }).lean();
 
-    const incomeMap = new Map<string, any>();
+    const incomeTransactions: any[] = [];
+    const processedOrderIds = new Set<string>();
+    const processedOrderNums = new Set<string>();
 
-    payments.forEach((p) => {
+    payments.forEach((p: any) => {
+      if (p.orderNumber) processedOrderNums.add(p.orderNumber);
+      if (p.orderId) processedOrderIds.add(p.orderId.toString());
+
       const ref = p.orderNumber ? `#${p.orderNumber}` : `PAY-${p._id.toString().slice(-6)}`;
-      const key = p.orderNumber || (p.orderId ? p.orderId.toString() : p._id.toString());
-      if (!incomeMap.has(key)) {
-        incomeMap.set(key, {
-          id: p._id.toString(),
-          refNumber: ref,
-          date: p.paidAt,
-          type: 'Income' as const,
-          category: 'Order Payment',
-          description: `Order #${p.orderNumber || ''} payment from ${p.customerName || 'Customer'}`,
-          paymentMethod: p.paymentMethod || 'Cash',
-          amount: p.amount,
-        });
-      }
+      incomeTransactions.push({
+        id: p._id.toString(),
+        refNumber: ref,
+        date: p.paidAt || p.createdAt,
+        type: 'Income' as const,
+        category: 'Order Payment',
+        description: `Order #${p.orderNumber || ''} payment from ${p.customerName || 'Customer'}`,
+        paymentMethod: p.paymentMethod || 'Cash',
+        amount: p.amount,
+      });
     });
 
     orders.forEach((o: any) => {
-      const amt = o.paymentStatus === 'Paid' ? o.totalAmount : (o.advancePaid > 0 ? o.advancePaid : 0);
-      const ref = `#${o.orderNumber}`;
-      const oNum = o.orderNumber;
       const oId = o._id.toString();
-      if (amt > 0 && !incomeMap.has(oNum) && !incomeMap.has(oId)) {
-        incomeMap.set(oNum || oId, {
-          id: oId,
-          refNumber: ref,
-          date: o.orderDate || o.createdAt,
-          type: 'Income' as const,
-          category: 'Order Payment',
-          description: `Order #${o.orderNumber} payment from ${o.customerSnapshot?.name || 'Customer'}`,
-          paymentMethod: o.paymentMethod || 'Cash',
-          amount: amt,
-        });
+      const oNum = o.orderNumber;
+      if (!processedOrderIds.has(oId) && (!oNum || !processedOrderNums.has(oNum))) {
+        const amt = o.paymentStatus === 'Paid' ? o.totalAmount : (o.advancePaid > 0 ? o.advancePaid : 0);
+        if (amt > 0) {
+          const ref = `#${o.orderNumber}`;
+          incomeTransactions.push({
+            id: oId,
+            refNumber: ref,
+            date: o.orderDate || o.createdAt,
+            type: 'Income' as const,
+            category: 'Order Payment',
+            description: `Order #${o.orderNumber} payment from ${o.customerSnapshot?.name || 'Customer'}`,
+            paymentMethod: o.paymentMethod || 'Cash',
+            amount: amt,
+          });
+        }
       }
     });
-
-    const incomeTransactions = Array.from(incomeMap.values());
     const expenseTransactions = expenses.map((e) => ({
       id: e._id.toString(),
       refNumber: e.voucherNumber,
@@ -292,4 +274,3 @@ export const getAccountsSummary = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-

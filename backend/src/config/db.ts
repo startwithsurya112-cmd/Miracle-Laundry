@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 export const connectDB = async (): Promise<boolean> => {
   try {
-    let connStr = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/intelligentlaundry';
+    let connStr = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/miraclelaundry';
     
     // Auto-fix accidentally pasted backslashes
     if (connStr.includes('mongodb+srv:\\')) {

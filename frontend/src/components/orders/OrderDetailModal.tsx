@@ -168,8 +168,12 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                         <td className="py-2.5 px-3 font-semibold">{item.itemName}</td>
                         <td className="py-2.5 px-3 text-brand-600 dark:text-brand-400 font-medium">{item.serviceName}</td>
                         <td className="py-2.5 px-3 text-center font-bold">{item.quantity}</td>
-                        <td className="py-2.5 px-3 text-right">{currencySymbol}{item.unitPrice}</td>
-                        <td className="py-2.5 px-3 text-right font-bold">{currencySymbol}{item.subtotal}</td>
+                        <td className="py-2.5 px-3 text-right">
+                          {item.unitPrice === 0 ? <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">In Kg Pack</span> : `${currencySymbol}${item.unitPrice}`}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold">
+                          {item.subtotal === 0 ? <span className="text-slate-400 font-normal text-[11px]">-</span> : `${currencySymbol}${item.subtotal}`}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -184,11 +188,13 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
                       <p className="font-bold text-slate-900 dark:text-white">{item.itemName}</p>
                       <p className="text-[11px] text-brand-600 dark:text-brand-400 font-medium">{item.serviceName}</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">
-                        {item.quantity} × {currencySymbol}{item.unitPrice}
+                        {item.quantity} {item.unitPrice === 0 ? '(In Kg Pack)' : `× ${currencySymbol}${item.unitPrice}`}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-extrabold text-slate-900 dark:text-white">{currencySymbol}{item.subtotal}</p>
+                      <p className="font-extrabold text-slate-900 dark:text-white">
+                        {item.subtotal === 0 ? '-' : `${currencySymbol}${item.subtotal}`}
+                      </p>
                     </div>
                   </div>
                 ))}

@@ -12,7 +12,6 @@ import { StatusBadge } from '../components/ui/Badge';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { OrderDetailModal } from '../components/orders/OrderDetailModal';
 import { PaymentModal } from '../components/orders/PaymentModal';
-import { EditOrderModal } from '../components/orders/EditOrderModal';
 import { InvoiceView } from '../components/invoice/InvoiceView';
 import {
   Search,
@@ -22,7 +21,6 @@ import {
   CreditCard,
   Trash2,
   Eye,
-  Edit,
   RefreshCw,
   ShoppingBag,
   ChevronLeft,
@@ -30,11 +28,9 @@ import {
 } from 'lucide-react';
 
 import { useToast } from '../context/ToastContext';
-import { useAuth } from '../context/AuthContext';
 
 export const OrdersPage: React.FC = () => {
   const { showToast } = useToast();
-  const { selectedShop, selectedShopId } = useAuth();
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
 
@@ -53,8 +49,6 @@ export const OrdersPage: React.FC = () => {
 
   // Selected Order Modals
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
@@ -62,7 +56,7 @@ export const OrdersPage: React.FC = () => {
   const navigate = useNavigate();
 
   const loadOrders = async () => {
-    if (orders.length === 0) setIsLoading(true);
+    setIsLoading(true);
     try {
       const [orderRes, setRes] = await Promise.all([
         fetchOrders({
@@ -94,12 +88,8 @@ export const OrdersPage: React.FC = () => {
   };
 
   useEffect(() => {
-    setPage(1);
-  }, [selectedShopId]);
-
-  useEffect(() => {
     loadOrders();
-  }, [search, statusFilter, paymentStatusFilter, page, limit, selectedShopId]);
+  }, [search, statusFilter, paymentStatusFilter, page, limit]);
 
   const currencySymbol = setting?.currencySymbol || '₹';
 
@@ -168,33 +158,18 @@ export const OrdersPage: React.FC = () => {
             title="Refresh Orders"
             className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-all"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-brand-600' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
 
           <button
             onClick={() => navigate('/orders/new')}
-            className="px-4 py-2.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-brand-600/20 active:scale-95 transition-all"
+            className="px-4 py-2.5 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-extrabold text-xs shadow-md shadow-brand-600/30 flex items-center justify-center gap-2 active:scale-95 transition-all"
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
+            <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>New Order</span>
           </button>
         </div>
       </div>
-
-      {/* Branch Context Indicator */}
-      {selectedShop && (
-        <div className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-50 via-white to-brand-50 dark:from-indigo-950/40 dark:via-slate-900 dark:to-brand-950/40 border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs flex items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-semibold text-slate-700 dark:text-slate-200">
-              Branch Orders: <strong className="text-indigo-600 dark:text-indigo-400">[{selectedShop.code}] {selectedShop.name}</strong> ({selectedShop.region})
-            </span>
-          </div>
-          <span className="text-[11px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
-            {totalOrdersCount} orders found
-          </span>
-        </div>
-      )}
 
       {/* Filter & Search Controls */}
       <div className="glass-card p-4 space-y-3">
@@ -345,17 +320,6 @@ export const OrdersPage: React.FC = () => {
 
                           <button
                             onClick={() => {
-                              setEditingOrder(ord);
-                              setShowEditModal(true);
-                            }}
-                            title="Edit Order Details"
-                            className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600 dark:hover:bg-amber-950/60"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            onClick={() => {
                               setSelectedOrder(ord);
                               setShowInvoiceModal(true);
                             }}
@@ -443,15 +407,6 @@ export const OrdersPage: React.FC = () => {
                     </button>
                     <button
                       onClick={() => {
-                        setEditingOrder(ord);
-                        setShowEditModal(true);
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 text-xs font-semibold flex items-center gap-1"
-                    >
-                      <Edit className="w-3.5 h-3.5" /> Edit
-                    </button>
-                    <button
-                      onClick={() => {
                         setSelectedOrder(ord);
                         setShowInvoiceModal(true);
                       }}
@@ -522,7 +477,7 @@ export const OrdersPage: React.FC = () => {
       </div>
 
       {/* Modals */}
-      {selectedOrder && !showInvoiceModal && !showPaymentModal && !showEditModal && (
+      {selectedOrder && !showInvoiceModal && !showPaymentModal && (
         <OrderDetailModal
           order={selectedOrder}
           setting={setting}
@@ -532,22 +487,6 @@ export const OrdersPage: React.FC = () => {
           }}
           onRecordPayment={() => setShowPaymentModal(true)}
           onOpenInvoice={() => setShowInvoiceModal(true)}
-        />
-      )}
-
-      {showEditModal && editingOrder && (
-        <EditOrderModal
-          order={editingOrder}
-          setting={setting}
-          isOpen={showEditModal}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditingOrder(null);
-          }}
-          onSave={() => {
-            loadOrders();
-            showToast('✅ Order details updated successfully!', 'success');
-          }}
         />
       )}
 

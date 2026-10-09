@@ -10,6 +10,12 @@ import {
 import { Service, Setting } from '../types';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import {
+  KgServiceRate,
+  getKgServicesList,
+  saveKgServicesList,
+} from '../data/posCatalogData';
+import { useToast } from '../context/ToastContext';
+import {
   WashingMachine,
   Plus,
   Edit,
@@ -18,14 +24,22 @@ import {
   CheckCircle2,
   XCircle,
   X,
+  Scale,
 } from 'lucide-react';
 
 export const ServicesPage: React.FC = () => {
+  const { showToast } = useToast();
   const [services, setServices] = useState<Service[]>([]);
   const [setting, setSetting] = useState<Setting | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
+
+  // --- Kg Services State ---
+  const [kgServicesList, setKgServicesList] = useState<KgServiceRate[]>(getKgServicesList());
+  const [showKgModal, setShowKgModal] = useState(false);
+  const [editingKgService, setEditingKgService] = useState<KgServiceRate | null>(null);
+  const [kgFormData, setKgFormData] = useState({ name: '', ratePerKg: 120 });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -112,6 +126,50 @@ export const ServicesPage: React.FC = () => {
     }
   };
 
+  const handleOpenEditKg = (kgServ: KgServiceRate) => {
+    setEditingKgService(kgServ);
+    setKgFormData({ name: kgServ.name, ratePerKg: kgServ.ratePerKg });
+    setShowKgModal(true);
+  };
+
+  const handleOpenAddKg = () => {
+    setEditingKgService(null);
+    setKgFormData({ name: '', ratePerKg: 100 });
+    setShowKgModal(true);
+  };
+
+  const handleSaveKgService = (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = kgFormData.name.trim();
+    const ratePerKg = Number(kgFormData.ratePerKg);
+    if (!name) {
+      showToast('Please enter a service name', 'error');
+      return;
+    }
+    if (isNaN(ratePerKg) || ratePerKg < 0) {
+      showToast('Please enter a valid rate per Kg', 'error');
+      return;
+    }
+
+    setKgServicesList((prev) => {
+      let updated: KgServiceRate[];
+      if (editingKgService) {
+        updated = prev.map((item) =>
+          item.name === editingKgService.name || (editingKgService.id && item.id === editingKgService.id)
+            ? { ...item, name, ratePerKg }
+            : item
+        );
+      } else {
+        updated = [...prev, { id: `kg-${Date.now()}`, name, ratePerKg }];
+      }
+      saveKgServicesList(updated);
+      return updated;
+    });
+
+    setShowKgModal(false);
+    showToast(`✅ Rate for "${name}" updated to ${currencySymbol}${ratePerKg}/Kg!`, 'success');
+  };
+
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
@@ -132,6 +190,52 @@ export const ServicesPage: React.FC = () => {
           <Plus className="w-4 h-4 stroke-[2.5]" />
           <span>New Service</span>
         </button>
+      </div>
+
+      {/* BY WEIGHT (KG) SERVICE RATES CATALOG CARD */}
+      <div className="glass-card p-5 space-y-4 border-l-4 border-l-brand-600">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+              <Scale className="w-4.5 h-4.5 text-brand-600" /> By Weight (Kg) Laundry Rates
+            </h3>
+            <p className="text-xs text-slate-500">
+              Manage per-kg pricing rates used in the Express POS By Weight builder
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleOpenAddKg}
+            className="px-3.5 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all w-fit"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Kg Rate
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {kgServicesList.map((kgServ) => (
+            <div
+              key={kgServ.name}
+              className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between shadow-xs"
+            >
+              <div>
+                <p className="font-extrabold text-xs text-slate-900 dark:text-white">{kgServ.name}</p>
+                <p className="text-sm font-black text-brand-600 dark:text-brand-400 mt-1">
+                  {currencySymbol}{kgServ.ratePerKg}.00 <span className="text-[10px] text-slate-400 font-normal">/ Kg</span>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleOpenEditKg(kgServ)}
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600 transition-all font-bold text-xs flex items-center gap-1 shadow-xs"
+              >
+                <Edit className="w-3.5 h-3.5 text-brand-600" /> Edit Rate
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Services Row-by-Row Table List View */}
@@ -396,6 +500,70 @@ export const ServicesPage: React.FC = () => {
                   className="flex-1 py-2 rounded-xl bg-brand-600 text-white text-xs font-semibold shadow-md"
                 >
                   Save Service
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Kg Service Rate Modal */}
+      {showKgModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                <Scale className="w-5 h-5 text-brand-600" />
+                <span>{editingKgService ? 'Edit Kg Service Rate' : 'Add New Kg Service Rate'}</span>
+              </h3>
+              <button onClick={() => setShowKgModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveKgService} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Kg Service Package Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={kgFormData.name}
+                  onChange={(e) => setKgFormData({ ...kgFormData, name: e.target.value })}
+                  placeholder="e.g. Wash & Iron, Express Laundry"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Rate per Kg ({currencySymbol}) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={kgFormData.ratePerKg}
+                  onChange={(e) => setKgFormData({ ...kgFormData, ratePerKg: Number(e.target.value) })}
+                  placeholder="e.g. 120"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-black text-brand-600 text-base"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowKgModal(false)}
+                  className="flex-1 py-2 rounded-xl border text-xs font-semibold text-slate-600 dark:text-slate-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-extrabold shadow-md"
+                >
+                  Save Kg Rate
                 </button>
               </div>
             </form>

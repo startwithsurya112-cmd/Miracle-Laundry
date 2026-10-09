@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -15,11 +15,6 @@ import {
   Clock,
   PanelLeftClose,
   PanelLeftOpen,
-  Building2,
-  ChevronDown,
-  Check,
-  Globe,
-  MapPin,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -28,34 +23,16 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) => {
-  const { admin, logout, isSuperAdmin, shops, selectedShop, selectedShopId, selectShop } = useAuth();
+  const { admin, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showBranchMenu, setShowBranchMenu] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
-
-  const branchMenuRef = useRef<HTMLDivElement>(null);
-  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  // Close dropdowns on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (branchMenuRef.current && !branchMenuRef.current.contains(e.target as Node)) {
-        setShowBranchMenu(false);
-      }
-      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
-        setShowProfileMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -66,9 +43,9 @@ export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSide
   };
 
   return (
-    <header className="h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-2.5 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-30 w-full">
+    <header className="h-16 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 lg:px-8 flex items-center justify-between sticky top-0 z-20">
       {/* Mobile Brand / Desktop Search & Live Clock */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div className="flex items-center gap-3">
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
@@ -79,135 +56,21 @@ export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSide
           </button>
         )}
 
-        <div className="lg:hidden flex items-center gap-1.5 shrink-0">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white p-0.5 border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 overflow-hidden">
+        <div className="lg:hidden flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-white p-0.5 border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 overflow-hidden">
             <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover rounded-md" />
           </div>
-          <span className="hidden xs:inline-flex font-black text-xs sm:text-sm text-slate-900 dark:text-white items-center gap-1">
-            Miracle <Sparkles className="w-3 h-3 text-brand-500 fill-brand-500" />
+          <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1">
+            Miracle Laundry <Sparkles className="w-3 h-3 text-brand-500 fill-brand-500" />
           </span>
         </div>
 
-        {/* Multi-Branch Selector / Branch Badge */}
-        {isSuperAdmin ? (
-          <div className="relative shrink min-w-0" ref={branchMenuRef}>
-            <button
-              onClick={() => setShowBranchMenu((prev) => !prev)}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold shadow-sm transition-all max-w-[145px] sm:max-w-none"
-            >
-              {selectedShop ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span className="font-mono text-[10px] sm:text-[11px] text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/60 px-1 py-0.5 rounded border border-brand-200 dark:border-brand-800 shrink-0">
-                    {selectedShop.code}
-                  </span>
-                  <span className="truncate text-[11px] sm:text-xs">{selectedShop.name}</span>
-                </>
-              ) : (
-                <>
-                  <Globe className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                  <span className="truncate text-[11px] sm:text-xs">All Branches</span>
-                </>
-              )}
-              <ChevronDown className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 shrink-0 transition-transform ${showBranchMenu ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* Branch Switcher Dropdown */}
-            {showBranchMenu && (
-              <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-3.5 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Switch Branch Context</span>
-                  <span className="text-[10px] text-slate-400 font-mono">{shops.length} Active</span>
-                </div>
-
-                <div className="max-h-64 overflow-y-auto py-1">
-                  {/* All Branches Global Option */}
-                  <button
-                    onClick={() => {
-                      selectShop('all');
-                      setShowBranchMenu(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-left transition-colors ${
-                      selectedShopId === 'all'
-                        ? 'bg-brand-50 dark:bg-brand-950/50 text-brand-600 dark:text-brand-400 font-semibold'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                        <Globe className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <p className="leading-tight">All Branches (Global Overview)</p>
-                        <p className="text-[10px] text-slate-400">Cross-store aggregated data</p>
-                      </div>
-                    </div>
-                    {selectedShopId === 'all' && <Check className="w-4 h-4 text-brand-600 dark:text-brand-400" />}
-                  </button>
-
-                  <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
-
-                  {/* Individual Branch Options */}
-                  {shops.map((s) => (
-                    <button
-                      key={s._id}
-                      onClick={() => {
-                        selectShop(s._id);
-                        setShowBranchMenu(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-left transition-colors ${
-                        selectedShopId === s._id
-                          ? 'bg-brand-50 dark:bg-brand-950/50 text-brand-600 dark:text-brand-400 font-semibold'
-                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-[10px] font-bold font-mono">
-                          {s.code.slice(0, 3)}
-                        </div>
-                        <div className="truncate">
-                          <p className="leading-tight truncate">{s.name}</p>
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {s.region} • {s.code}
-                          </p>
-                        </div>
-                      </div>
-                      {selectedShopId === s._id && <Check className="w-4 h-4 text-brand-600 dark:text-brand-400 shrink-0 ml-2" />}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="px-3 py-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-                  <button
-                    onClick={() => {
-                      setShowBranchMenu(false);
-                      navigate('/shops');
-                    }}
-                    className="w-full py-1.5 text-center text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline flex items-center justify-center gap-1.5"
-                  >
-                    <Building2 className="w-3.5 h-3.5" />
-                    <span>Manage All Branches</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-semibold">
-            <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span className="font-mono text-[10px] bg-emerald-200/60 dark:bg-emerald-900/60 px-1 py-0.5 rounded">
-              {(admin?.shop as any)?.code || selectedShop?.code || 'BRANCH'}
-            </span>
-            <span className="truncate max-w-[140px]">{(admin?.shop as any)?.name || selectedShop?.name || 'Local Branch'}</span>
-          </div>
-        )}
-
         {/* Global Search Bar (Desktop & Tablet) */}
-        <form onSubmit={handleSearchSubmit} className="hidden sm:flex items-center relative w-48 md:w-64">
+        <form onSubmit={handleSearchSubmit} className="hidden sm:flex items-center relative w-56 md:w-72">
           <Search className="w-4 h-4 absolute left-3 text-slate-400" />
           <input
             type="text"
-            placeholder="Search order #, customer..."
+            placeholder="Search order #, customer name..."
             value={globalSearch}
             onChange={(e) => setGlobalSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
@@ -215,7 +78,7 @@ export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSide
         </form>
 
         {/* Live Date & Time Display */}
-        <div className="hidden xl:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-xs font-semibold">
+        <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-xs font-semibold">
           <Clock className="w-3.5 h-3.5 text-brand-500" />
           <span>{currentTime.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
           <span className="opacity-40">•</span>
@@ -253,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSide
         </button>
 
         {/* User Profile Menu */}
-        <div className="relative" ref={profileMenuRef}>
+        <div className="relative">
           <button
             onClick={() => setShowProfileMenu((prev) => !prev)}
             className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -265,9 +128,7 @@ export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSide
               <p className="text-xs font-semibold text-slate-900 dark:text-white leading-tight">
                 {admin?.name || 'Shop Admin'}
               </p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 capitalize">
-                {isSuperAdmin ? 'Super Admin' : 'Branch Admin'}
-              </p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 capitalize">Administrator</p>
             </div>
           </button>
 
@@ -277,23 +138,7 @@ export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSide
               <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
                 <p className="text-xs font-semibold text-slate-900 dark:text-white">{admin?.name}</p>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{admin?.email}</p>
-                <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-50 dark:bg-brand-950 text-brand-600 dark:text-brand-400 border border-brand-200 dark:border-brand-800 capitalize">
-                  {isSuperAdmin ? '👑 Super Admin' : '📍 Branch Manager'}
-                </span>
               </div>
-
-              {isSuperAdmin && (
-                <button
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    navigate('/shops');
-                  }}
-                  className="w-full flex items-center gap-2 px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                >
-                  <Building2 className="w-3.5 h-3.5" />
-                  Branches & Shops
-                </button>
-              )}
 
               <button
                 onClick={() => {
@@ -324,4 +169,3 @@ export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSide
     </header>
   );
 };
-

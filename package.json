@@ -1,8 +1,8 @@
 {
-  "name": "intelligent-laundry-shop",
+  "name": "miracle-laundry-shop",
   "version": "1.0.0",
   "private": true,
-  "description": "Intelligent Laundry POS & ERP Management System",
+  "description": "Miracle Laundry POS & ERP Management System",
   "scripts": {
     "build:backend": "cd backend && npm install && npm run build",
     "build:frontend": "cd frontend && npm install && npm run build",

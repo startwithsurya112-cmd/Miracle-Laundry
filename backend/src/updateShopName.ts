@@ -12,8 +12,8 @@ const updateShopName = async () => {
     await mongoose.connect(mongoUri);
     console.log('Connected to MongoDB Atlas...');
 
-    const result = await Setting.updateMany({}, { shopName: 'Intelligent Laundry' });
-    console.log(`Updated ${result.modifiedCount} settings documents with shopName = 'Intelligent Laundry'`);
+    const result = await Setting.updateMany({}, { shopName: 'Miracle Laundry' });
+    console.log(`Updated ${result.modifiedCount} settings documents with shopName = 'Miracle Laundry'`);
 
     await mongoose.disconnect();
     process.exit(0);

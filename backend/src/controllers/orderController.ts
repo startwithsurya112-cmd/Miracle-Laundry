@@ -4,8 +4,6 @@ import Order, { OrderStatus, PaymentStatus } from '../models/Order';
 import Customer from '../models/Customer';
 import Payment from '../models/Payment';
 import Setting from '../models/Setting';
-import Shop from '../models/Shop';
-import { AuthRequest } from '../middleware/auth';
 import { generateOrderNumber } from '../utils/orderNumberGenerator';
 import { generateQRCodeDataUrl } from '../utils/qrGenerator';
 import { sendAutomatedWhatsAppMessage, sendAutomatedWhatsAppDocument } from '../services/whatsappGateway';
@@ -27,14 +25,14 @@ export const getPublicOrderByNumber = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Order number is required' });
     }
 
-    let order = await Order.findOne({ orderNumber: orderNum }).populate('shopId');
+    let order = await Order.findOne({ orderNumber: orderNum });
     if (!order) {
-      order = await Order.findOne({ orderNumber: new RegExp('^' + orderNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }).populate('shopId');
+      order = await Order.findOne({ orderNumber: new RegExp('^' + orderNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') });
     }
     if (!order) {
       const digits = orderNum.replace(/\D/g, '');
       if (digits) {
-        order = await Order.findOne({ orderNumber: new RegExp(digits + '(/|$)') }).populate('shopId');
+        order = await Order.findOne({ orderNumber: new RegExp(digits + '(/|$)') });
       }
     }
 
@@ -48,7 +46,7 @@ export const getPublicOrderByNumber = async (req: Request, res: Response) => {
   }
 };
 
-export const getOrders = async (req: AuthRequest, res: Response) => {
+export const getOrders = async (req: Request, res: Response) => {
   try {
     const { status, paymentStatus, search, dateFrom, dateTo, page = 1, limit = 20 } = req.query;
 
@@ -57,10 +55,6 @@ export const getOrders = async (req: AuthRequest, res: Response) => {
     const skip = (pageNum - 1) * limitNum;
 
     let query: any = {};
-
-    if (req.targetShopId) {
-      query.shopId = req.targetShopId;
-    }
 
     if (status) {
       query.status = status;
@@ -88,7 +82,6 @@ export const getOrders = async (req: AuthRequest, res: Response) => {
     const total = await Order.countDocuments(query);
     const orders = await Order.find(query)
       .populate('customer', 'name mobile address email')
-      .populate('shopId', 'name code region phone')
       .sort({ orderDate: -1, createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
@@ -109,13 +102,9 @@ export const getOrders = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const getOrderById = async (req: AuthRequest, res: Response) => {
+export const getOrderById = async (req: Request, res: Response) => {
   try {
-    let query: any = { _id: req.params.id };
-    if (req.targetShopId) {
-      query.shopId = req.targetShopId;
-    }
-    const order = await Order.findOne(query).populate('customer').populate('shopId');
+    const order = await Order.findById(req.params.id).populate('customer');
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
@@ -128,7 +117,7 @@ export const getOrderById = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const createOrder = async (req: AuthRequest, res: Response) => {
+export const createOrder = async (req: Request, res: Response) => {
   try {
     const {
       customerId,
@@ -140,17 +129,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       advancePaid = 0,
       paymentMethod = 'Pending',
       notes = '',
-      shopId,
     } = req.body;
-
-    let assignedShopId = req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId;
-
-    if (!assignedShopId) {
-      const defaultShop = await Shop.findOne({ isActive: true }).sort({ createdAt: 1 });
-      if (defaultShop) {
-        assignedShopId = defaultShop._id.toString();
-      }
-    }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'At least one laundry item is required' });
@@ -171,7 +150,6 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         customerObj = existing;
       } else {
         customerObj = new Customer({
-          shopId: assignedShopId,
           name: custData.name || 'Walk-in Customer',
           mobile: mob,
           address: custData.address || 'Local',
@@ -187,7 +165,6 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         customerObj = existing;
       } else {
         customerObj = new Customer({
-          shopId: assignedShopId,
           name: 'Walk-in Customer',
           mobile: '9876543210',
           address: 'Local Shop',
@@ -207,7 +184,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         serviceName: item.serviceName || 'Wash & Press',
         quantity: qty,
         unitPrice: price,
-        subtotal: item.subtotal !== undefined && item.subtotal !== null ? Number(item.subtotal) : Math.round(qty * price),
+        subtotal: qty * price,
       };
     });
 
@@ -228,7 +205,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       paymentStatus = 'Partially Paid';
     }
 
-    const orderNumber = await generateOrderNumber(assignedShopId);
+    const orderNumber = await generateOrderNumber();
 
     // QR Content for digital receipt
     const qrData = JSON.stringify({
@@ -246,7 +223,6 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 
     const order = new Order({
       orderNumber,
-      shopId: assignedShopId,
       customer: customerObj._id,
       customerSnapshot: {
         name: customerObj.name,
@@ -288,7 +264,6 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
     // Record initial payment if advance paid
     if (advPaid > 0) {
       const payment = new Payment({
-        shopId: assignedShopId,
         orderId: order._id,
         orderNumber: order.orderNumber,
         customerId: customerObj._id,
@@ -301,11 +276,11 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       await payment.save();
     }
 
-
     // Automated Background WhatsApp Notification on Order Creation
     if (customerObj && customerObj.mobile) {
-      const receiptUrl = `https://intellingentlaundry-1.onrender.com/receipt/${order.orderNumber}?r=${order.orderNumber}`;
-      const msg = `Hello *${customerObj.name}*,\n\nYour official laundry invoice & receipt for Order *#${order.orderNumber}* is ready!\n\n📋 *Invoice Summary*:\n• Order Date: ${new Date(order.orderDate).toLocaleDateString('en-GB')}\n• Status: ${order.status}\n• Total Amount: ₹${order.totalAmount}\n• Advance Paid: ₹${order.advancePaid}\n• Remaining Balance: ₹${order.remainingBalance}\n\n🔗 *View & Print Invoice Directly*:\n${receiptUrl}\n\nThank you for choosing Intelligent Laundry!`;
+      const baseUrl = process.env.FRONTEND_URL || 'https://miracle-laundry.onrender.com';
+      const receiptUrl = `${baseUrl.replace(/\/$/, '')}/receipt/${order.orderNumber}?r=${order.orderNumber}`;
+      const msg = `Hello *${customerObj.name}*,\n\nYour official laundry invoice & receipt for Order *#${order.orderNumber}* is ready!\n\n📋 *Invoice Summary*:\n• Order Date: ${new Date(order.orderDate).toLocaleDateString('en-GB')}\n• Status: ${order.status}\n• Total Amount: ₹${order.totalAmount}\n• Advance Paid: ₹${order.advancePaid}\n• Remaining Balance: ₹${order.remainingBalance}\n\n🔗 *View & Print Invoice Directly*:\n${receiptUrl}\n\nThank you for choosing Miracle Laundry!`;
       sendAutomatedWhatsAppMessage(customerObj.mobile, msg);
     }
 
@@ -319,17 +294,13 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
+export const updateOrderStatus = async (req: Request, res: Response) => {
   try {
     const { status, note } = req.body;
     const order = await Order.findById(req.params.id);
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
-    }
-
-    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
     }
 
     const validStatuses: OrderStatus[] = [
@@ -409,15 +380,11 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const sendOrderWhatsAppPDF = async (req: AuthRequest, res: Response) => {
+export const sendOrderWhatsAppPDF = async (req: Request, res: Response) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
-    }
-
-    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
     }
 
     let mobile = order.customerSnapshot?.mobile;
@@ -431,8 +398,7 @@ export const sendOrderWhatsAppPDF = async (req: AuthRequest, res: Response) => {
     }
 
     const setting = await Setting.findOne();
-    const shop = order.shopId ? await Shop.findById(order.shopId) : null;
-    const pdfBuffer = await generateInvoicePDFBuffer(order, setting, shop);
+    const pdfBuffer = await generateInvoicePDFBuffer(order, setting);
     const fileName = `Invoice_${order.orderNumber.replace(/[\/\\]/g, '_')}.pdf`;
 
     const sent = await sendAutomatedWhatsAppDocument(mobile, pdfBuffer, fileName);
@@ -447,20 +413,15 @@ export const sendOrderWhatsAppPDF = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const getOrderPDF = async (req: AuthRequest, res: Response) => {
+export const getOrderPDF = async (req: Request, res: Response) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
-    }
-
     const setting = await Setting.findOne();
-    const shop = order.shopId ? await Shop.findById(order.shopId) : null;
-    const pdfBuffer = await generateInvoicePDFBuffer(order, setting, shop);
+    const pdfBuffer = await generateInvoicePDFBuffer(order, setting);
     const fileName = `Invoice_${order.orderNumber.replace(/[\/\\]/g, '_')}.pdf`;
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -471,17 +432,13 @@ export const getOrderPDF = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const recordOrderPayment = async (req: AuthRequest, res: Response) => {
+export const recordOrderPayment = async (req: Request, res: Response) => {
   try {
     const { amount, paymentMethod, transactionId, note } = req.body;
     const order = await Order.findById(req.params.id);
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
-    }
-
-    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
     }
 
     const payAmount = Number(amount);
@@ -503,7 +460,6 @@ export const recordOrderPayment = async (req: AuthRequest, res: Response) => {
     await order.save();
 
     const payment = new Payment({
-      shopId: order.shopId,
       orderId: order._id,
       orderNumber: order.orderNumber,
       customerId: order.customer,
@@ -527,15 +483,11 @@ export const recordOrderPayment = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const deleteOrder = async (req: AuthRequest, res: Response) => {
+export const deleteOrder = async (req: Request, res: Response) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
-    }
-
-    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
     }
 
     await Order.findByIdAndDelete(req.params.id);
@@ -547,26 +499,41 @@ export const deleteOrder = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const updateOrder = async (req: AuthRequest, res: Response) => {
+export const updateOrder = async (req: Request, res: Response) => {
   try {
-    const { items, status, paymentStatus, paymentMethod, advancePaid, expectedDeliveryDate, notes, discount } = req.body;
+    const { items, status, paymentStatus, paymentMethod, advancePaid, expectedDeliveryDate, notes, discount, orderNumber } = req.body;
     const order = await Order.findById(req.params.id);
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    if (req.user?.role !== 'super_admin' && req.targetShopId && order.shopId && String(order.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: this order belongs to another branch.' });
+    if (orderNumber) {
+      order.orderNumber = orderNumber;
     }
 
     if (items && Array.isArray(items)) {
-      order.items = items;
-      const subtotal = items.reduce((sum: number, item: any) => sum + (Number(item.subtotal) || Number(item.price || 0) * Number(item.quantity || 1)), 0);
+      const normalizedItems = items.map((item: any) => {
+        const qty = Number(item.quantity) || 1;
+        const unitP = item.unitPrice !== undefined ? Number(item.unitPrice) : Number(item.price || 0);
+        const sub = item.subtotal !== undefined ? Number(item.subtotal) : unitP * qty;
+        return {
+          itemId: item.itemId || item.id || `item-${Date.now()}`,
+          itemName: item.itemName || item.name || item.garmentName || 'Item',
+          serviceId: item.serviceId || 'service',
+          serviceName: item.serviceName || 'Wash & Iron',
+          quantity: qty,
+          unitPrice: unitP,
+          subtotal: sub,
+        };
+      });
+
+      const subtotal = normalizedItems.reduce((sum: number, item: any) => sum + item.subtotal, 0);
       const disc = Number(discount !== undefined ? discount : order.discount || 0);
       order.discount = disc;
       order.subtotal = subtotal;
       order.totalAmount = Math.max(0, subtotal - disc);
+      order.items = normalizedItems;
     } else if (discount !== undefined) {
       const disc = Number(discount);
       order.discount = disc;
@@ -589,6 +556,21 @@ export const updateOrder = async (req: AuthRequest, res: Response) => {
       message: 'Order updated successfully',
       order,
     });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const fixOrder412 = async (req: Request, res: Response) => {
+  try {
+    const order = await Order.findOne({ orderNumber: /412/ });
+    if (order) {
+      const oldNum = order.orderNumber;
+      order.orderNumber = 'ORD-1/26';
+      await order.save();
+      return res.json({ success: true, message: `Successfully updated ${oldNum} to ORD-1/26`, order });
+    }
+    res.json({ success: true, message: 'No order with 412 found' });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -3,16 +3,9 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { connectDB } from './config/db';
 import Admin from './models/Admin';
-import Shop from './models/Shop';
 import Service from './models/Service';
 import LaundryItem from './models/LaundryItem';
 import Setting from './models/Setting';
-import Order from './models/Order';
-import Customer from './models/Customer';
-import Expense from './models/Expense';
-import Staff from './models/Staff';
-import MachineLog from './models/MachineLog';
-import Payment from './models/Payment';
 
 dotenv.config();
 
@@ -26,68 +19,20 @@ export const seedDatabase = async () => {
   try {
     console.log('[SEED] Starting database seeding process...');
 
-    // 1. Seed or Retrieve Default Main Shop/Branch
-    let mainShop = await Shop.findOne({ code: 'MAIN-01' });
-    if (!mainShop) {
-      // Check if existing Setting has shop details
-      const existingSetting = await Setting.findOne();
-      mainShop = await Shop.create({
-        name: existingSetting?.shopName || 'Miracle Laundry - Main Branch',
-        code: 'MAIN-01',
-        region: 'Central Zone',
-        phone: existingSetting?.phone || '+91 98765 43210',
-        email: existingSetting?.email || 'contact@miraclelaundry.com',
-        address: existingSetting?.address || '123 Sparkle Avenue, Suite 4B, Commercial Hub',
-        invoicePrefix: existingSetting?.invoicePrefix || 'ORD-',
-        gstNumber: existingSetting?.gstNumber || '22AAAAA0000A1Z5',
-        gstPercentage: existingSetting?.gstPercentage || 0,
-        currencySymbol: existingSetting?.currencySymbol || '₹',
-        currencyCode: existingSetting?.currencyCode || 'INR',
-        upiId: existingSetting?.upiId || '',
-        gpayNumber: existingSetting?.gpayNumber || '',
-        paymentQrUrl: existingSetting?.paymentQrUrl || '',
-        logoUrl: existingSetting?.logoUrl || '/logo.jpg',
-        termsAndConditions: existingSetting?.termsAndConditions || '1. Clothes not collected within 30 days are subject to storage charges.',
-        isActive: true,
-      });
-      console.log('[SEED] Default Main Branch created (code: MAIN-01)');
-    }
-
-    // 2. Seed Super Admin
-    let admin = await Admin.findOne({ username: 'adminIL' });
+    // 1. Seed Admin
+    let admin = await Admin.findOne({ username: { $in: ['admin', 'adminML', 'adminIL'] } });
     if (!admin) {
-      await Admin.deleteMany({ username: 'admin' });
-      const hashedPassword = await bcrypt.hash('IL@112', 10);
+      const hashedPassword = await bcrypt.hash('admin123', 10);
       await Admin.create({
-        username: 'adminIL',
+        username: 'admin',
         password: hashedPassword,
-        name: 'Master Business Owner',
-        email: 'owner@intelligentlaundry.com',
-        role: 'super_admin',
-        isActive: true,
+        name: 'Shop Owner',
+        email: 'contact@miraclelaundry.com',
       });
-      console.log('[SEED] Super Admin created (username: adminIL, password: IL@112, role: super_admin)');
-    } else {
-      if (admin.role !== 'super_admin') {
-        admin.role = 'super_admin';
-        await admin.save();
-      }
+      console.log('[SEED] Default admin created (username: admin, password: admin123)');
     }
 
-    // 3. Migrate any unassociated records to the Main Branch
-    if (mainShop) {
-      const mainShopId = mainShop._id;
-      await Promise.all([
-        Order.updateMany({ $or: [{ shopId: null }, { shopId: { $exists: false } }] }, { $set: { shopId: mainShopId } }),
-        Customer.updateMany({ $or: [{ shopId: null }, { shopId: { $exists: false } }] }, { $set: { shopId: mainShopId } }),
-        Expense.updateMany({ $or: [{ shopId: null }, { shopId: { $exists: false } }] }, { $set: { shopId: mainShopId } }),
-        Staff.updateMany({ $or: [{ shopId: null }, { shopId: { $exists: false } }] }, { $set: { shopId: mainShopId } }),
-        MachineLog.updateMany({ $or: [{ shopId: null }, { shopId: { $exists: false } }] }, { $set: { shopId: mainShopId } }),
-        Payment.updateMany({ $or: [{ shopId: null }, { shopId: { $exists: false } }] }, { $set: { shopId: mainShopId } }),
-      ]);
-    }
-
-    // 4. Seed Settings if missing or update branding
+    // 2. Seed Settings
     let setting = await Setting.findOne();
     if (!setting) {
       setting = await Setting.create({
@@ -105,16 +50,17 @@ export const seedDatabase = async () => {
         termsAndConditions: '1. Please inspect clothes upon delivery.\n2. Clothes not collected within 30 days are subject to storage charges.\n3. Colors may bleed on delicate items if not pre-informed.',
       });
       console.log('[SEED] Default settings created.');
-    } else if (setting.shopName.includes('Intelligent') || (setting.logoUrl && (setting.logoUrl.includes('unsplash') || setting.logoUrl.includes('Intelligent')))) {
+    } else if (setting.shopName?.includes('Intelligent') || setting.logoUrl?.includes('unsplash') || setting.logoUrl?.includes('Intelligent')) {
       setting.shopName = 'Miracle Laundry';
       setting.shopTagline = 'Express & Premium Laundry Services';
       setting.logoUrl = '/logo.jpg';
+      setting.email = 'contact@miraclelaundry.com';
       setting.invoicePrefix = 'ML-';
       await setting.save();
       console.log('[SEED] Settings updated with Miracle Laundry branding.');
     }
 
-    // 5. Seed Services (11 Main Services + 4 Kg Rates)
+    // 3. Seed Services (11 Main Services + 4 Kg Rates)
     const serviceCount = await Service.countDocuments();
     if (serviceCount === 0) {
       const defaultServices = [
@@ -149,4 +95,3 @@ export const seedDatabase = async () => {
 if (require.main === module) {
   seedDatabase().then(() => mongoose.connection.close());
 }
-

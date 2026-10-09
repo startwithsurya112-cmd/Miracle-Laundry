@@ -11,7 +11,6 @@ export type ExpenseCategory =
   | 'Miscellaneous';
 
 export interface IExpense extends Document {
-  shopId?: mongoose.Types.ObjectId;
   voucherNumber: string;
   expenseDate: Date;
   category: ExpenseCategory;
@@ -26,7 +25,6 @@ export interface IExpense extends Document {
 
 const ExpenseSchema: Schema = new Schema(
   {
-    shopId: { type: Schema.Types.ObjectId, ref: 'Shop', index: true },
     voucherNumber: { type: String, required: true },
     expenseDate: { type: Date, required: true, default: Date.now },
     category: {
@@ -46,7 +44,5 @@ const ExpenseSchema: Schema = new Schema(
   },
   { timestamps: true }
 );
-
-ExpenseSchema.index({ shopId: 1, expenseDate: -1 });
 
 export default mongoose.model<IExpense>('Expense', ExpenseSchema);

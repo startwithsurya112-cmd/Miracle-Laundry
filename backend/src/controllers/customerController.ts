@@ -1,10 +1,8 @@
 import { Request, Response } from 'express';
-import mongoose from 'mongoose';
 import Customer from '../models/Customer';
 import Order from '../models/Order';
-import { AuthRequest } from '../middleware/auth';
 
-export const getCustomers = async (req: AuthRequest, res: Response) => {
+export const getCustomers = async (req: Request, res: Response) => {
   try {
     const search = (req.query.search as string) || '';
     const page = parseInt(req.query.page as string) || 1;
@@ -12,35 +10,26 @@ export const getCustomers = async (req: AuthRequest, res: Response) => {
     const skip = (page - 1) * limit;
 
     let query: any = {};
-    if (req.targetShopId) {
-      query.shopId = req.targetShopId;
-    }
-
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { mobile: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { address: { $regex: search, $options: 'i' } },
-      ];
+      query = {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { mobile: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { address: { $regex: search, $options: 'i' } },
+        ],
+      };
     }
 
     const total = await Customer.countDocuments(query);
     const rawCustomers = await Customer.find(query)
-      .populate('shopId', 'name code')
       .sort({ createdAt: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    // Fast MongoDB Aggregation for order totals scoped by targetShopId
-    const orderMatch: any = {};
-    if (req.targetShopId) {
-      orderMatch.shopId = new mongoose.Types.ObjectId(req.targetShopId);
-    }
-
+    // Fast MongoDB Aggregation for order totals
     const orderStats = await Order.aggregate([
-      ...(Object.keys(orderMatch).length > 0 ? [{ $match: orderMatch }] : []),
       {
         $group: {
           _id: '$customer',
@@ -90,25 +79,16 @@ export const getCustomers = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const getCustomerById = async (req: AuthRequest, res: Response) => {
+export const getCustomerById = async (req: Request, res: Response) => {
   try {
     const customerObj = await Customer.findById(req.params.id);
     if (!customerObj) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
 
-    if (req.user?.role !== 'super_admin' && req.targetShopId && customerObj.shopId && String(customerObj.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: this customer belongs to another branch.' });
-    }
-
-    let orderFilter: any = {
+    const orders = await Order.find({
       $or: [{ customer: customerObj._id }, { 'customerSnapshot.mobile': customerObj.mobile }],
-    };
-    if (req.targetShopId) {
-      orderFilter.shopId = req.targetShopId;
-    }
-
-    const orders = await Order.find(orderFilter).sort({ createdAt: -1 });
+    }).sort({ createdAt: -1 });
 
     const customer = customerObj.toObject();
     customer.totalOrders = orders.length;
@@ -124,27 +104,20 @@ export const getCustomerById = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const createCustomer = async (req: AuthRequest, res: Response) => {
+export const createCustomer = async (req: Request, res: Response) => {
   try {
-    const { name, mobile, address, email, notes, shopId } = req.body;
+    const { name, mobile, address, email, notes } = req.body;
 
     if (!name || !mobile || !address) {
       return res.status(400).json({ success: false, message: 'Name, mobile number, and address are required' });
     }
 
-    const targetShop = req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId;
-    const existingQuery: any = { mobile };
-    if (targetShop) {
-      existingQuery.shopId = targetShop;
-    }
-
-    const existingCustomer = await Customer.findOne(existingQuery);
+    const existingCustomer = await Customer.findOne({ mobile });
     if (existingCustomer) {
-      return res.status(400).json({ success: false, message: 'Customer with this mobile number already exists in this branch' });
+      return res.status(400).json({ success: false, message: 'Customer with this mobile number already exists' });
     }
 
     const customer = new Customer({
-      shopId: targetShop,
       name,
       mobile,
       address,
@@ -166,25 +139,17 @@ export const createCustomer = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const updateCustomer = async (req: AuthRequest, res: Response) => {
+export const updateCustomer = async (req: Request, res: Response) => {
   try {
-    const { name, mobile, address, email, notes, shopId } = req.body;
+    const { name, mobile, address, email, notes } = req.body;
 
     const customer = await Customer.findById(req.params.id);
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
 
-    if (req.user?.role !== 'super_admin' && req.targetShopId && customer.shopId && String(customer.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: this customer belongs to another branch.' });
-    }
-
     if (mobile && mobile !== customer.mobile) {
-      const existingQuery: any = { mobile, _id: { $ne: req.params.id } };
-      if (req.targetShopId) {
-        existingQuery.shopId = req.targetShopId;
-      }
-      const existing = await Customer.findOne(existingQuery);
+      const existing = await Customer.findOne({ mobile });
       if (existing) {
         return res.status(400).json({ success: false, message: 'Mobile number already used by another customer' });
       }
@@ -195,7 +160,6 @@ export const updateCustomer = async (req: AuthRequest, res: Response) => {
     if (address) customer.address = address;
     if (email !== undefined) customer.email = email;
     if (notes !== undefined) customer.notes = notes;
-    if (shopId !== undefined && req.user?.role === 'super_admin') customer.shopId = shopId;
 
     await customer.save();
 
@@ -209,15 +173,11 @@ export const updateCustomer = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const deleteCustomer = async (req: AuthRequest, res: Response) => {
+export const deleteCustomer = async (req: Request, res: Response) => {
   try {
     const customer = await Customer.findById(req.params.id);
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
-    }
-
-    if (req.user?.role !== 'super_admin' && req.targetShopId && customer.shopId && String(customer.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: this customer belongs to another branch.' });
     }
 
     const orderCount = await Order.countDocuments({
@@ -240,4 +200,3 @@ export const deleteCustomer = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-

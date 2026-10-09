@@ -41,11 +41,11 @@ export const LandingWebsitePage: React.FC = () => {
     });
   }, []);
 
-  const shopName = 'Miracle Laundry';
+  const shopName = setting?.shopName || 'Miracle Laundry';
   const logoUrl = setting?.logoUrl && !setting.logoUrl.includes('unsplash.com') ? setting.logoUrl : '/logo.jpg';
   const phone = setting?.phone || '+91 98765 43210';
   const cleanPhone = phone.replace(/\D/g, '');
-  const email = 'intelligentno1laundry@gmail.com';
+  const email = setting?.email || 'contact@miraclelaundry.com';
   const address = '2/516 B Thiruvalluvar Nagar, Near ambal hospital, Malumichampatti, Coimbatore 641050';
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
@@ -169,7 +169,7 @@ export const LandingWebsitePage: React.FC = () => {
       name: 'Priya Sundaram',
       location: 'Malumichampatti, Coimbatore',
       rating: 5,
-      comment: 'IntelligentLaundry handled my silk saree polishing and wedding suit dry cleaning perfectly! No chemical smell and crisp packaging.',
+      comment: 'Miracle Laundry handled my silk saree polishing and wedding suit dry cleaning perfectly! No chemical smell and crisp packaging.',
       tag: 'Verified Customer',
     },
     {
@@ -190,7 +190,7 @@ export const LandingWebsitePage: React.FC = () => {
 
   const faqs = [
     {
-      q: 'How do I book a service with IntelligentLaundry?',
+      q: 'How do I book a service with Miracle Laundry?',
       a: 'Simply call us directly on ' + phone + '! You can tap any "Call Store" button on this website to talk to our store team immediately.',
     },
     {
@@ -262,7 +262,7 @@ export const LandingWebsitePage: React.FC = () => {
         <div className="absolute inset-0 z-0">
           <img
             src="/hero_laundry.jpg"
-            alt="IntelligentLaundry Store"
+            alt="Miracle Laundry Store"
             className="w-full h-full object-cover object-center scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-slate-950/80 backdrop-blur-xs" />
@@ -440,7 +440,7 @@ export const LandingWebsitePage: React.FC = () => {
       </section>
 
       {/* ========================================================================= */}
-      {/* 4. WHY CHOOSE INTELLIGENTLAUNDRY */}
+      {/* 4. WHY CHOOSE MIRACLE LAUNDRY */}
       {/* ========================================================================= */}
       <section id="why-us" className="py-14 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 space-y-10">
@@ -679,7 +679,7 @@ export const LandingWebsitePage: React.FC = () => {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-8 mt-8 border-t border-slate-900 flex justify-between items-center text-[11px] text-slate-500">
           <p>© {new Date().getFullYear()} {shopName}. All rights reserved.</p>
-          <p>Powered by IntelligentLaundry Operating System</p>
+          <p>Powered by Miracle Laundry Operating System</p>
         </div>
       </footer>
 

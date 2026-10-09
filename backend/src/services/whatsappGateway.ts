@@ -21,7 +21,7 @@ export const initWhatsAppGateway = async () => {
       version,
       auth: state,
       printQRInTerminal: false,
-      browser: ['Intelligent Laundry', 'Chrome', '1.0.0'],
+      browser: ['Miracle Laundry', 'Chrome', '1.0.0'],
     });
 
     waSocket.ev.on('creds.update', saveCreds);

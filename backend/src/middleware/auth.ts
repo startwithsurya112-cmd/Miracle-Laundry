@@ -3,33 +3,21 @@ import { Request, Response, NextFunction } from 'express';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'laundry_shop_super_secret_jwt_key_2026';
 
-export interface AuthUserPayload {
-  id: string;
-  username: string;
-  name: string;
-  role: 'super_admin' | 'branch_admin' | 'staff';
-  shopId?: string | null;
-}
-
 export interface AuthRequest extends Request {
-  user?: AuthUserPayload;
-  targetShopId?: string | null;
+  user?: {
+    id: string;
+    username: string;
+    name: string;
+  };
 }
 
-export const generateToken = (payload: AuthUserPayload, rememberMe: boolean = false) => {
+export const generateToken = (payload: { id: string; username: string; name: string }, rememberMe: boolean = false) => {
   const expiresIn = rememberMe ? '30d' : '24h';
   return jwt.sign(payload, JWT_SECRET, { expiresIn });
 };
 
-export const verifyToken = (token: string): AuthUserPayload => {
-  const decoded = jwt.verify(token, JWT_SECRET) as any;
-  return {
-    id: decoded.id,
-    username: decoded.username,
-    name: decoded.name,
-    role: decoded.role || 'super_admin',
-    shopId: decoded.shopId || null,
-  };
+export const verifyToken = (token: string) => {
+  return jwt.verify(token, JWT_SECRET) as { id: string; username: string; name: string };
 };
 
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -48,37 +36,8 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
   try {
     const decoded = verifyToken(token);
     req.user = decoded;
-
-    // Apply Shop Isolation Scoping
-    if (decoded.role === 'super_admin') {
-      const headerShopId = req.headers['x-shop-id'] as string;
-      const queryShopId = req.query.shopId as string;
-      const selected = headerShopId || queryShopId || null;
-      req.targetShopId = selected && selected !== 'all' && selected !== 'null' && selected !== 'undefined' ? selected : null;
-    } else {
-      // Branch Admin or Staff is strictly locked to their assigned shopId
-      if (!decoded.shopId) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied. Your account is not assigned to any branch. Please contact the Super Admin.',
-        });
-      }
-      req.targetShopId = String(decoded.shopId);
-    }
-
     next();
   } catch (error) {
     return res.status(401).json({ success: false, message: 'Invalid or expired token.' });
   }
 };
-
-export const requireSuperAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!req.user || req.user.role !== 'super_admin') {
-    return res.status(403).json({
-      success: false,
-      message: 'Permission denied. Super Admin access required.',
-    });
-  }
-  next();
-};
-

@@ -1,7 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IGarmentCategory extends Document {
-  shopId?: mongoose.Types.ObjectId;
   name: string;
   description?: string;
   icon?: string;
@@ -13,8 +12,7 @@ export interface IGarmentCategory extends Document {
 
 const GarmentCategorySchema: Schema = new Schema(
   {
-    shopId: { type: Schema.Types.ObjectId, ref: 'Shop', index: true, default: null },
-    name: { type: String, required: true, trim: true },
+    name: { type: String, required: true, unique: true, trim: true },
     description: { type: String, default: '' },
     icon: { type: String, default: 'Tag' },
     displayOrder: { type: Number, default: 0 },
@@ -22,7 +20,5 @@ const GarmentCategorySchema: Schema = new Schema(
   },
   { timestamps: true }
 );
-
-GarmentCategorySchema.index({ shopId: 1, name: 1 });
 
 export default mongoose.model<IGarmentCategory>('GarmentCategory', GarmentCategorySchema);

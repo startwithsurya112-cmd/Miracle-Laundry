@@ -10,6 +10,7 @@ import {
   updateOrderStatus,
   recordOrderPayment,
   deleteOrder,
+  fixOrder412,
 } from '../controllers/orderController';
 import { authMiddleware } from '../middleware/auth';
 
@@ -23,6 +24,7 @@ router.get('/public/*', getPublicOrderByNumber);
 // Protected routes (Admin Auth required)
 router.use(authMiddleware);
 
+router.post('/fix-order-412', fixOrder412);
 router.get('/', getOrders);
 router.get('/:id', getOrderById);
 router.get('/:id/pdf', getOrderPDF);

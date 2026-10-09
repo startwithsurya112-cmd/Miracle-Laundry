@@ -1,7 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IIroningWorkLog extends Document {
-  shopId?: mongoose.Types.ObjectId;
   staff?: mongoose.Types.ObjectId;
   staffName: string;
   tableName: string; // e.g. "Table 1", "Table 2", "Table 3"
@@ -15,7 +14,6 @@ export interface IIroningWorkLog extends Document {
 
 const IroningWorkLogSchema: Schema = new Schema(
   {
-    shopId: { type: Schema.Types.ObjectId, ref: 'Shop', index: true },
     staff: { type: Schema.Types.ObjectId, ref: 'Staff' },
     staffName: { type: String, required: true },
     tableName: { type: String, required: true, default: 'Table 1' },
@@ -26,7 +24,5 @@ const IroningWorkLogSchema: Schema = new Schema(
   },
   { timestamps: true }
 );
-
-IroningWorkLogSchema.index({ shopId: 1, date: -1 });
 
 export default mongoose.model<IIroningWorkLog>('IroningWorkLog', IroningWorkLogSchema);

@@ -3,7 +3,6 @@ export interface POSCatalogItem {
   name: string;
   price: number;
   subCategory: string;
-  servicePrices?: Record<string, number>;
 }
 
 export interface POSGroup {
@@ -29,37 +28,62 @@ export const mainServicesList = [
 ] as const;
 
 export interface KgServiceRate {
+  id?: string;
   name: string;
   ratePerKg: number;
 }
 
-export const kgServicesList: KgServiceRate[] = [
-  { name: 'Wash & Iron', ratePerKg: 120 },
-  { name: 'Express Laundry', ratePerKg: 199 },
-  { name: 'Premium Laundry', ratePerKg: 159 },
-  { name: 'Premium Express Laundry', ratePerKg: 299 },
+export const defaultKgServicesList: KgServiceRate[] = [
+  { id: 'kg-1', name: 'Wash & Iron', ratePerKg: 120 },
+  { id: 'kg-2', name: 'Express Laundry', ratePerKg: 199 },
+  { id: 'kg-3', name: 'Premium Laundry', ratePerKg: 159 },
+  { id: 'kg-4', name: 'Premium Express Laundry', ratePerKg: 299 },
 ];
+
+export const getKgServicesList = (): KgServiceRate[] => {
+  try {
+    const saved = localStorage.getItem('kgServicesList');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse kgServicesList from localStorage', e);
+  }
+  return defaultKgServicesList;
+};
+
+export const saveKgServicesList = (list: KgServiceRate[]): void => {
+  try {
+    localStorage.setItem('kgServicesList', JSON.stringify(list));
+  } catch (e) {
+    console.error('Failed to save kgServicesList to localStorage', e);
+  }
+};
+
+export const kgServicesList: KgServiceRate[] = getKgServicesList();
 
 /**
  * Dynamic Service-Based Pricing Calculator
  * Returns the exact unit price for a garment item depending on the selected Service Category
  */
 export const getItemPriceForService = (
-  item: { name: string; price: number; category?: string; servicePrices?: Record<string, number> },
+  item: { name: string; price?: number; defaultPrice?: number; category?: string; servicePrices?: Record<string, number> },
   serviceName: string
 ): number => {
-  // 1. If explicit service price is mapped for this item and service, always use it
-  if (
-    item.servicePrices &&
-    item.servicePrices[serviceName] !== undefined &&
-    item.servicePrices[serviceName] !== null &&
-    !isNaN(Number(item.servicePrices[serviceName]))
-  ) {
-    return Number(item.servicePrices[serviceName]);
+  if (item.servicePrices && typeof item.servicePrices === 'object') {
+    const customRate = (item.servicePrices as any)[serviceName] !== undefined
+      ? (item.servicePrices as any)[serviceName]
+      : typeof (item.servicePrices as any).get === 'function' ? (item.servicePrices as any).get(serviceName) : undefined;
+
+    if (customRate !== undefined && customRate !== null && !isNaN(Number(customRate)) && Number(customRate) >= 0) {
+      return Number(customRate);
+    }
   }
 
-  const name = item.name.toLowerCase();
-  const base = item.price && item.price > 0 ? item.price : 15;
+  const name = (item.name || '').toLowerCase();
+  const rawPrice = item.price !== undefined ? item.price : item.defaultPrice;
+  const base = rawPrice && rawPrice > 0 ? rawPrice : 15;
 
   switch (serviceName) {
     case 'Ironing':

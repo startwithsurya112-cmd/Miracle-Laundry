@@ -1,13 +1,11 @@
 import { Request, Response } from 'express';
-import mongoose from 'mongoose';
 import Order from '../models/Order';
 import Customer from '../models/Customer';
 import Service from '../models/Service';
 import Payment from '../models/Payment';
 import Expense from '../models/Expense';
-import { AuthRequest } from '../middleware/auth';
 
-export const getDashboardStats = async (req: AuthRequest, res: Response) => {
+export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const {
       preset,
@@ -73,10 +71,6 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
     // Build filter query for orders
     let orderQuery: any = {};
 
-    if (req.targetShopId) {
-      orderQuery.shopId = req.targetShopId;
-    }
-
     if (paymentStatus) {
       orderQuery.paymentStatus = paymentStatus;
     }
@@ -94,13 +88,10 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
 
     // 1. Total Orders List & Count
     const totalOrdersCount = await Order.countDocuments(orderQuery);
-    const ordersList = await Order.find(orderQuery).populate('shopId', 'name code').sort({ orderDate: -1, createdAt: -1 }).lean();
+    const ordersList = await Order.find(orderQuery).sort({ orderDate: -1, createdAt: -1 }).lean();
 
     // 2. Payments Received List & Total
     let paymentMatch: any = {};
-    if (req.targetShopId) {
-      paymentMatch.shopId = new mongoose.Types.ObjectId(req.targetShopId);
-    }
     if (startDate || endDate) {
       paymentMatch.paidAt = {};
       if (startDate) paymentMatch.paidAt.$gte = startDate;
@@ -124,9 +115,6 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
 
     // 4. New Customers List & Count
     let customerQuery: any = {};
-    if (req.targetShopId) {
-      customerQuery.shopId = req.targetShopId;
-    }
     if (startDate || endDate) {
       customerQuery.createdAt = {};
       if (startDate) customerQuery.createdAt.$gte = startDate;
@@ -163,20 +151,13 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     
-    const todayPayMatch: any = { paidAt: { $gte: todayStart, $lte: todayEnd } };
-    const todayOrdMatch: any = { orderDate: { $gte: todayStart, $lte: todayEnd } };
-    if (req.targetShopId) {
-      todayPayMatch.shopId = new mongoose.Types.ObjectId(req.targetShopId);
-      todayOrdMatch.shopId = new mongoose.Types.ObjectId(req.targetShopId);
-    }
-
     const [todayPayments, todayOrdersSum] = await Promise.all([
       Payment.aggregate([
-        { $match: todayPayMatch },
+        { $match: { paidAt: { $gte: todayStart, $lte: todayEnd } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
       Order.aggregate([
-        { $match: todayOrdMatch },
+        { $match: { orderDate: { $gte: todayStart, $lte: todayEnd } } },
         {
           $group: {
             _id: null,
@@ -195,20 +176,13 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
     const todayRevenue = todayPayTotal > 0 ? todayPayTotal : todayAdvTotal;
 
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    const monthPayMatch: any = { paidAt: { $gte: monthStart } };
-    const monthOrdMatch: any = { orderDate: { $gte: monthStart } };
-    if (req.targetShopId) {
-      monthPayMatch.shopId = new mongoose.Types.ObjectId(req.targetShopId);
-      monthOrdMatch.shopId = new mongoose.Types.ObjectId(req.targetShopId);
-    }
-
     const [monthPayments, monthOrdersSum] = await Promise.all([
       Payment.aggregate([
-        { $match: monthPayMatch },
+        { $match: { paidAt: { $gte: monthStart } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
       Order.aggregate([
-        { $match: monthOrdMatch },
+        { $match: { orderDate: { $gte: monthStart } } },
         {
           $group: {
             _id: null,
@@ -276,7 +250,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const getRevenueReport = async (req: AuthRequest, res: Response) => {
+export const getRevenueReport = async (req: Request, res: Response) => {
   try {
     const { period = '30days', preset } = req.query;
     const now = new Date();
@@ -309,15 +283,8 @@ export const getRevenueReport = async (req: AuthRequest, res: Response) => {
     startDate.setHours(0, 0, 0, 0);
 
     // 1. Daily Chart Data: Group payments or orders by date
-    const payMatch: any = { paidAt: { $gte: startDate, $lte: endDate } };
-    const ordMatch: any = { orderDate: { $gte: startDate, $lte: endDate } };
-    if (req.targetShopId) {
-      payMatch.shopId = new mongoose.Types.ObjectId(req.targetShopId);
-      ordMatch.shopId = new mongoose.Types.ObjectId(req.targetShopId);
-    }
-
     let chartData = await Payment.aggregate([
-      { $match: payMatch },
+      { $match: { paidAt: { $gte: startDate, $lte: endDate } } },
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$paidAt' } },
@@ -330,7 +297,7 @@ export const getRevenueReport = async (req: AuthRequest, res: Response) => {
 
     if (chartData.length === 0) {
       chartData = await Order.aggregate([
-        { $match: ordMatch },
+        { $match: { orderDate: { $gte: startDate, $lte: endDate } } },
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m-%d', date: '$orderDate' } },
@@ -344,7 +311,7 @@ export const getRevenueReport = async (req: AuthRequest, res: Response) => {
 
     // 2. Service Breakdown
     let serviceBreakdown = await Order.aggregate([
-      { $match: ordMatch },
+      { $match: { orderDate: { $gte: startDate, $lte: endDate } } },
       { $unwind: '$items' },
       {
         $group: {
@@ -357,9 +324,7 @@ export const getRevenueReport = async (req: AuthRequest, res: Response) => {
     ]);
 
     // 3. Top Customers
-    const custFilter: any = req.targetShopId ? { shopId: req.targetShopId } : {};
-    const topCustomers = await Customer.find(custFilter).sort({ totalSpent: -1 }).limit(10);
-
+    const topCustomers = await Customer.find().sort({ totalSpent: -1 }).limit(10);
 
     res.json({
       success: true,
@@ -376,7 +341,7 @@ export const getRevenueReport = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const getProfitAndLossReport = async (req: AuthRequest, res: Response) => {
+export const getProfitAndLossReport = async (req: Request, res: Response) => {
   try {
     const { preset = 'current_month', dateFrom, dateTo } = req.query;
 
@@ -408,14 +373,9 @@ export const getProfitAndLossReport = async (req: AuthRequest, res: Response) =>
     }
 
     // 1. Calculate Gross Payments Revenue within period
-    const paymentQuery: any = {
+    const payments = await Payment.find({
       paidAt: { $gte: startDate, $lte: endDate },
-    };
-    if (req.targetShopId) {
-      paymentQuery.shopId = req.targetShopId;
-    }
-
-    const payments = await Payment.find(paymentQuery).lean();
+    }).lean();
 
     let grossRevenue = 0;
     let cashIncome = 0;
@@ -431,13 +391,9 @@ export const getProfitAndLossReport = async (req: AuthRequest, res: Response) =>
 
     // Fallback if no payment models, calculate from orders
     if (grossRevenue === 0) {
-      const orderQuery: any = {
+      const orders = await Order.find({
         orderDate: { $gte: startDate, $lte: endDate },
-      };
-      if (req.targetShopId) {
-        orderQuery.shopId = req.targetShopId;
-      }
-      const orders = await Order.find(orderQuery).lean();
+      }).lean();
       orders.forEach((o: any) => {
         const amt = o.paymentStatus === 'Paid' ? (o.totalAmount || 0) : (o.advancePaid || 0);
         grossRevenue += amt;
@@ -449,14 +405,9 @@ export const getProfitAndLossReport = async (req: AuthRequest, res: Response) =>
     }
 
     // 2. Calculate Operating Expenses within period
-    const expenseQuery: any = {
+    const expenses = await Expense.find({
       expenseDate: { $gte: startDate, $lte: endDate },
-    };
-    if (req.targetShopId) {
-      expenseQuery.shopId = req.targetShopId;
-    }
-
-    const expenses = await Expense.find(expenseQuery).lean();
+    }).lean();
 
     let totalExpenses = 0;
     let cashExpenses = 0;
@@ -491,23 +442,14 @@ export const getProfitAndLossReport = async (req: AuthRequest, res: Response) =>
         const mEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
         const monthLabel = mStart.toLocaleString('default', { month: 'short', year: '2-digit' });
 
-        const mPayQuery: any = { paidAt: { $gte: mStart, $lte: mEnd } };
-        const mExpQuery: any = { expenseDate: { $gte: mStart, $lte: mEnd } };
-        const mOrdQuery: any = { orderDate: { $gte: mStart, $lte: mEnd } };
-        if (req.targetShopId) {
-          mPayQuery.shopId = req.targetShopId;
-          mExpQuery.shopId = req.targetShopId;
-          mOrdQuery.shopId = req.targetShopId;
-        }
-
         const [mPayments, mExpenses] = await Promise.all([
-          Payment.find(mPayQuery).lean(),
-          Expense.find(mExpQuery).lean(),
+          Payment.find({ paidAt: { $gte: mStart, $lte: mEnd } }).lean(),
+          Expense.find({ expenseDate: { $gte: mStart, $lte: mEnd } }).lean(),
         ]);
 
         let mRev = mPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
         if (mRev === 0) {
-          const mOrders = await Order.find(mOrdQuery).lean();
+          const mOrders = await Order.find({ orderDate: { $gte: mStart, $lte: mEnd } }).lean();
           mRev = mOrders.reduce(
             (sum, o: any) => sum + (o.paymentStatus === 'Paid' ? (o.totalAmount || 0) : (o.advancePaid || 0)),
             0
@@ -553,14 +495,13 @@ export const getProfitAndLossReport = async (req: AuthRequest, res: Response) =>
   }
 };
 
-export const exportCSV = async (req: AuthRequest, res: Response) => {
+export const exportCSV = async (req: Request, res: Response) => {
   try {
     const { type = 'orders' } = req.query;
-    const shopFilter = req.targetShopId ? { shopId: req.targetShopId } : {};
 
     if (type === 'pnl') {
-      const payments = await Payment.find(shopFilter);
-      const expenses = await Expense.find(shopFilter);
+      const payments = await Payment.find();
+      const expenses = await Expense.find();
 
       let grossRev = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
       let totalExp = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -586,7 +527,7 @@ export const exportCSV = async (req: AuthRequest, res: Response) => {
       res.setHeader('Content-Disposition', 'attachment; filename="laundry_profit_loss_statement.csv"');
       return res.send(csv);
     } else if (type === 'orders') {
-      const orders = await Order.find(shopFilter).sort({ createdAt: -1 });
+      const orders = await Order.find().sort({ createdAt: -1 });
 
       let csv = 'Order Number,Customer Name,Customer Mobile,Order Date,Expected Delivery,Status,Payment Status,Total Amount,Advance Paid,Remaining Balance\n';
       orders.forEach((o) => {
@@ -599,7 +540,7 @@ export const exportCSV = async (req: AuthRequest, res: Response) => {
       res.setHeader('Content-Disposition', 'attachment; filename="laundry_orders.csv"');
       return res.send(csv);
     } else if (type === 'customers') {
-      const customers = await Customer.find(shopFilter).sort({ name: 1 });
+      const customers = await Customer.find().sort({ name: 1 });
       let csv = 'Name,Mobile,Address,Email,Total Orders,Total Spent,Created At\n';
       customers.forEach((c) => {
         csv += `"${c.name}","${c.mobile}","${c.address}","${c.email || ''}",${c.totalOrders},${c.totalSpent},"${new Date(c.createdAt).toISOString().slice(0, 10)}"\n`;
@@ -614,4 +555,3 @@ export const exportCSV = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-

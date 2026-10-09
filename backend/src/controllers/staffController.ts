@@ -1,35 +1,31 @@
 import { Request, Response } from 'express';
-import mongoose from 'mongoose';
 import Staff from '../models/Staff';
 import Attendance from '../models/Attendance';
 import IroningWorkLog from '../models/IroningWorkLog';
 import Setting from '../models/Setting';
-import { AuthRequest } from '../middleware/auth';
 import { sendAutomatedWhatsAppDocument } from '../services/whatsappGateway';
 import { generatePayslipPDFBuffer } from '../utils/pdfGenerator';
 
 // -------------------------------------------------------------
 // 1. Staff Profile Management
 // -------------------------------------------------------------
-export const getAllStaff = async (req: AuthRequest, res: Response) => {
+export const getAllStaff = async (req: Request, res: Response) => {
   try {
-    const filter = req.targetShopId ? { shopId: req.targetShopId } : {};
-    const staffList = await Staff.find(filter).sort({ createdAt: 1 });
+    const staffList = await Staff.find().sort({ createdAt: 1 });
     return res.json({ success: true, staff: staffList });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-export const createStaff = async (req: AuthRequest, res: Response) => {
+export const createStaff = async (req: Request, res: Response) => {
   try {
-    const { name, mobile, role, assignedTable, removeDate, shopId } = req.body;
+    const { name, mobile, role, assignedTable, removeDate } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Staff name is required.' });
     }
 
     const newStaff = new Staff({
-      shopId: req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId,
       name: name.trim(),
       mobile: mobile ? mobile.trim() : '',
       role: role ? role.trim() : 'Ironing Staff',
@@ -46,18 +42,14 @@ export const createStaff = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const updateStaff = async (req: AuthRequest, res: Response) => {
+export const updateStaff = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, mobile, role, assignedTable, status, removeDate, shopId } = req.body;
+    const { name, mobile, role, assignedTable, status, removeDate } = req.body;
 
     const staff = await Staff.findById(id);
     if (!staff) {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
-    }
-
-    if (req.user?.role !== 'super_admin' && req.targetShopId && staff.shopId && String(staff.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: staff belongs to another branch.' });
     }
 
     if (name) staff.name = name.trim();
@@ -66,7 +58,6 @@ export const updateStaff = async (req: AuthRequest, res: Response) => {
     if (assignedTable !== undefined) staff.assignedTable = assignedTable.trim();
     if (status) staff.status = status;
     if (removeDate !== undefined) staff.removeDate = removeDate ? new Date(removeDate) : undefined;
-    if (shopId !== undefined && req.user?.role === 'super_admin') staff.shopId = shopId;
 
     await staff.save();
     return res.json({ success: true, staff, message: 'Staff profile updated.' });
@@ -75,18 +66,9 @@ export const updateStaff = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const deleteStaff = async (req: AuthRequest, res: Response) => {
+export const deleteStaff = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const staff = await Staff.findById(id);
-    if (!staff) {
-      return res.status(404).json({ success: false, message: 'Staff member not found.' });
-    }
-
-    if (req.user?.role !== 'super_admin' && req.targetShopId && staff.shopId && String(staff.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: staff belongs to another branch.' });
-    }
-
     await Staff.findByIdAndDelete(id);
     return res.json({ success: true, message: 'Staff member removed.' });
   } catch (error: any) {
@@ -97,15 +79,11 @@ export const deleteStaff = async (req: AuthRequest, res: Response) => {
 // -------------------------------------------------------------
 // 2. Attendance Register & Tracking
 // -------------------------------------------------------------
-export const getAttendance = async (req: AuthRequest, res: Response) => {
+export const getAttendance = async (req: Request, res: Response) => {
   try {
     const { date, month, year, period = 'month', startDate, endDate } = req.query;
     let query: any = {};
-    if (req.targetShopId) {
-      query.shopId = req.targetShopId;
-    }
     const now = new Date();
-
 
     if (startDate && endDate && startDate !== 'undefined' && endDate !== 'undefined') {
       const s = new Date(startDate as string);
@@ -150,10 +128,7 @@ export const getAttendance = async (req: AuthRequest, res: Response) => {
     const attendanceRecords = await Attendance.find(query).sort({ date: -1 }).populate('staff');
 
     // Aggregate summary per Staff Member for the requested filter period
-    const summaryMatch: any = query.date ? { date: query.date } : {};
-    if (req.targetShopId) {
-      summaryMatch.shopId = new mongoose.Types.ObjectId(req.targetShopId);
-    }
+    const summaryMatch = query.date ? { date: query.date } : {};
 
     const monthlySummary = await Attendance.aggregate([
       { $match: summaryMatch },
@@ -175,7 +150,7 @@ export const getAttendance = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const markAttendance = async (req: AuthRequest, res: Response) => {
+export const markAttendance = async (req: Request, res: Response) => {
   try {
     const { staffId, date, status, clockIn, clockOut, overtimeHours, notes } = req.body;
     if (!staffId) {
@@ -185,10 +160,6 @@ export const markAttendance = async (req: AuthRequest, res: Response) => {
     const staffMember = await Staff.findById(staffId);
     if (!staffMember) {
       return res.status(404).json({ success: false, message: 'Staff member not found.' });
-    }
-
-    if (req.user?.role !== 'super_admin' && req.targetShopId && staffMember.shopId && String(staffMember.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: staff belongs to another branch.' });
     }
 
     const targetDate = date ? new Date(date) : new Date();
@@ -209,7 +180,6 @@ export const markAttendance = async (req: AuthRequest, res: Response) => {
       await record.save();
     } else {
       record = new Attendance({
-        shopId: staffMember.shopId || req.targetShopId || null,
         staff: staffId,
         staffName: staffMember.name,
         date: start,
@@ -228,19 +198,13 @@ export const markAttendance = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const deleteAttendance = async (req: AuthRequest, res: Response) => {
+export const deleteAttendance = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const record = await Attendance.findById(id);
-    if (!record) {
+    const deleted = await Attendance.findByIdAndDelete(id);
+    if (!deleted) {
       return res.status(404).json({ success: false, message: 'Attendance record not found.' });
     }
-
-    if (req.user?.role !== 'super_admin' && req.targetShopId && record.shopId && String(record.shopId) !== req.targetShopId) {
-      return res.status(403).json({ success: false, message: 'Access denied: attendance belongs to another branch.' });
-    }
-
-    await Attendance.findByIdAndDelete(id);
     return res.json({ success: true, message: 'Attendance record deleted successfully.' });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: error.message });
@@ -250,13 +214,10 @@ export const deleteAttendance = async (req: AuthRequest, res: Response) => {
 // -------------------------------------------------------------
 // 3. Ironing Work Logger
 // -------------------------------------------------------------
-export const getIroningWorkLogs = async (req: AuthRequest, res: Response) => {
+export const getIroningWorkLogs = async (req: Request, res: Response) => {
   try {
     const { tableName, startDate, endDate } = req.query;
     let query: any = {};
-    if (req.targetShopId) {
-      query.shopId = req.targetShopId;
-    }
 
     if (tableName) {
       query.tableName = tableName;
@@ -282,9 +243,9 @@ export const getIroningWorkLogs = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const logIroningWork = async (req: AuthRequest, res: Response) => {
+export const logIroningWork = async (req: Request, res: Response) => {
   try {
-    const { staffId, staffName, tableName, itemName, quantity, notes, date, shopId } = req.body;
+    const { staffId, staffName, tableName, itemName, quantity, notes, date } = req.body;
 
     if (!tableName || !itemName || !quantity) {
       return res.status(400).json({ success: false, message: 'Table name, item description, and quantity are required.' });
@@ -293,16 +254,10 @@ export const logIroningWork = async (req: AuthRequest, res: Response) => {
     let finalStaffName = staffName || 'Ironing Staff';
     if (staffId) {
       const s = await Staff.findById(staffId);
-      if (s) {
-        if (req.user?.role !== 'super_admin' && req.targetShopId && s.shopId && String(s.shopId) !== req.targetShopId) {
-          return res.status(403).json({ success: false, message: 'Access denied: staff belongs to another branch.' });
-        }
-        finalStaffName = s.name;
-      }
+      if (s) finalStaffName = s.name;
     }
 
     const newLog = new IroningWorkLog({
-      shopId: req.user?.role === 'super_admin' ? (req.targetShopId || shopId || null) : req.targetShopId,
       staff: staffId || undefined,
       staffName: finalStaffName,
       tableName: tableName.trim(),
@@ -322,7 +277,7 @@ export const logIroningWork = async (req: AuthRequest, res: Response) => {
 // -------------------------------------------------------------
 // 4. Performance Reports (Day Wise, Month Wise, Year Wise)
 // -------------------------------------------------------------
-export const getStaffPerformanceReport = async (req: AuthRequest, res: Response) => {
+export const getStaffPerformanceReport = async (req: Request, res: Response) => {
   try {
     const { filter = 'month', startDate: customStart, endDate: customEnd } = req.query;
     const now = new Date();
@@ -347,14 +302,9 @@ export const getStaffPerformanceReport = async (req: AuthRequest, res: Response)
       endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     }
 
-    const matchQuery: any = { date: { $gte: startDate, $lte: endDate } };
-    if (req.targetShopId) {
-      matchQuery.shopId = new mongoose.Types.ObjectId(req.targetShopId);
-    }
-
     // 1. Table Totals
     const tableTotals = await IroningWorkLog.aggregate([
-      { $match: matchQuery },
+      { $match: { date: { $gte: startDate, $lte: endDate } } },
       {
         $group: {
           _id: '$tableName',
@@ -367,7 +317,7 @@ export const getStaffPerformanceReport = async (req: AuthRequest, res: Response)
 
     // 2. Staff Totals
     const staffTotals = await IroningWorkLog.aggregate([
-      { $match: matchQuery },
+      { $match: { date: { $gte: startDate, $lte: endDate } } },
       {
         $group: {
           _id: '$staffName',

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'intelligent-laundry-v6';
+const CACHE_NAME = 'miracle-laundry-v6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

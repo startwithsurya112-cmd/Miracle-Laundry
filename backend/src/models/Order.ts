@@ -32,7 +32,6 @@ export interface IStatusHistory {
 
 export interface IOrder extends Document {
   orderNumber: string;
-  shopId?: mongoose.Types.ObjectId;
   customer: mongoose.Types.ObjectId;
   customerSnapshot: {
     name: string;
@@ -66,7 +65,7 @@ const OrderItemSchema = new Schema({
   itemName: { type: String, required: true },
   serviceId: { type: Schema.Types.Mixed },
   serviceName: { type: String, required: true },
-  quantity: { type: Number, required: true, min: 0.01 },
+  quantity: { type: Number, required: true, min: 1 },
   unitPrice: { type: Number, required: true, min: 0 },
   subtotal: { type: Number, required: true, min: 0 },
 });
@@ -80,7 +79,6 @@ const StatusHistorySchema = new Schema({
 const OrderSchema: Schema = new Schema(
   {
     orderNumber: { type: String, required: true, unique: true, trim: true },
-    shopId: { type: Schema.Types.ObjectId, ref: 'Shop', index: true },
     customer: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
     customerSnapshot: {
       name: { type: String, required: true },
@@ -131,7 +129,6 @@ const OrderSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-OrderSchema.index({ shopId: 1, orderNumber: 1 });
 OrderSchema.index({ orderNumber: 'text', 'customerSnapshot.name': 'text', 'customerSnapshot.mobile': 'text' });
 OrderSchema.index({ orderDate: -1, createdAt: -1 });
 OrderSchema.index({ status: 1 });

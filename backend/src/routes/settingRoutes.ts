@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getSettings, updateSettings, resetData } from '../controllers/settingController';
-import { authMiddleware, requireSuperAdmin } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
 
@@ -9,7 +9,7 @@ router.get('/public', getSettings);
 
 router.use(authMiddleware);
 router.get('/', getSettings);
-router.put('/', requireSuperAdmin, updateSettings);
-router.delete('/reset', requireSuperAdmin, resetData);
+router.put('/', updateSettings);
+router.delete('/reset', resetData);
 
 export default router;

@@ -3,7 +3,6 @@ import mongoose, { Schema, Document } from 'mongoose';
 export type MachineType = 'Washer Extractor' | 'Dryer';
 
 export interface IMachineLog extends Document {
-  shopId?: mongoose.Types.ObjectId;
   machineType: MachineType;
   date: Date;
   programName: string; // e.g. "Heavy Stain Wash (60m)", "Normal Wash (45m)", "Quick Wash (30m)", "Dryer Standard (30m)"
@@ -17,7 +16,6 @@ export interface IMachineLog extends Document {
 
 const MachineLogSchema: Schema = new Schema(
   {
-    shopId: { type: Schema.Types.ObjectId, ref: 'Shop', index: true },
     machineType: {
       type: String,
       enum: ['Washer Extractor', 'Dryer'],
@@ -32,7 +30,5 @@ const MachineLogSchema: Schema = new Schema(
   },
   { timestamps: true }
 );
-
-MachineLogSchema.index({ shopId: 1, date: -1 });
 
 export default mongoose.model<IMachineLog>('MachineLog', MachineLogSchema);

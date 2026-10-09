@@ -10,8 +10,6 @@ import {
   Expense,
   AccountsSummary,
   AccountsTransaction,
-  Shop,
-  UserAccount,
 } from '../types';
 import { posGroupCatalog } from '../data/posCatalogData';
 
@@ -32,17 +30,6 @@ export const getAuthToken = () => localStorage.getItem('auth_token');
 export const setAuthToken = (token: string) => localStorage.setItem('auth_token', token);
 export const removeAuthToken = () => localStorage.removeItem('auth_token');
 
-// Shop isolation selector helpers
-export const getSelectedShopId = () => localStorage.getItem('selected_shop_id');
-export const setSelectedShopId = (id: string | null) => {
-  if (id && id !== 'all') {
-    localStorage.setItem('selected_shop_id', id);
-  } else {
-    localStorage.removeItem('selected_shop_id');
-  }
-  clearApiCache();
-};
-
 // In-Memory API Response Cache for instant 0ms loads
 const apiMemoryCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -61,14 +48,11 @@ export const peekApiCache = (endpoint: string) => {
 
 const fetchApiNetwork = async (endpoint: string, options: RequestInit = {}, retries = 1): Promise<any> => {
   const token = getAuthToken();
-  const selectedShopId = getSelectedShopId();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(selectedShopId ? { 'X-Shop-Id': selectedShopId } : {}),
     ...(options.headers || {}),
   };
-
 
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -135,12 +119,12 @@ export const loginApi = async (usernameOrCreds: any, passwordParam?: string) => 
       body: JSON.stringify({ username, password }),
     });
   } catch (err) {
-    if ((username === 'adminIL' && password === 'IL@112') || (username === 'admin' && password === 'admin123')) {
+    if ((username === 'adminML' && password === 'ML@112') || (username === 'adminIL' && password === 'IL@112') || (username === 'admin' && password === 'admin123')) {
       const mockAdmin: Admin = {
         id: 'admin-1',
-        username: 'adminIL',
+        username: username,
         name: 'Shop Owner',
-        email: 'owner@intelligentlaundry.com',
+        email: 'contact@miraclelaundry.com',
       };
       return { success: true, token: 'mock-jwt-token-xyz', admin: mockAdmin };
     }
@@ -158,9 +142,9 @@ export const getMe = async () => {
       success: true,
       admin: {
         id: 'admin-1',
-        username: 'adminIL',
+        username: 'admin',
         name: 'Shop Owner',
-        email: 'owner@intelligentlaundry.com',
+        email: 'contact@miraclelaundry.com',
       },
     };
   }
@@ -392,14 +376,9 @@ export const createItemApi = async (itemData: any) => {
       body: JSON.stringify(itemData),
     });
   } catch (err) {
-    const initialServicePrices = itemData.servicePrices ? { ...itemData.servicePrices } : {};
-    if (itemData.serviceName && itemData.defaultPrice !== undefined) {
-      initialServicePrices[itemData.serviceName] = Number(itemData.defaultPrice);
-    }
     const newItem: LaundryItem = {
       _id: 'item-' + Date.now(),
       ...itemData,
-      servicePrices: initialServicePrices,
       isActive: true,
     };
     const current = getMockItems();
@@ -419,15 +398,7 @@ export const updateItemApi = async (id: string, itemData: any) => {
     const current = getMockItems();
     const idx = current.findIndex((i) => i._id === id);
     if (idx !== -1) {
-      const currentServicePrices = current[idx].servicePrices ? { ...current[idx].servicePrices } : {};
-      if (itemData.serviceName && itemData.defaultPrice !== undefined) {
-        currentServicePrices[itemData.serviceName] = Number(itemData.defaultPrice);
-      }
-      current[idx] = {
-        ...current[idx],
-        ...itemData,
-        servicePrices: currentServicePrices,
-      };
+      current[idx] = { ...current[idx], ...itemData };
       saveMockItems(current);
     }
     return { success: true, item: current[idx] };
@@ -649,54 +620,12 @@ export const createOrderApi = async (orderData: any) => {
       paymentStatus = 'Partially Paid';
     }
 
-    // Determine assigned shop for branch-separated order numbering
-    const currentShopId = orderData.shopId || localStorage.getItem('selected_shop_id') || 'shop-main';
-    let prefix = 'ORD-';
-    try {
-      const storedShop = localStorage.getItem('active_shop_info');
-      if (storedShop) {
-        const parsed = JSON.parse(storedShop);
-        if (parsed?.invoicePrefix) {
-          prefix = parsed.invoicePrefix.trim();
-        } else if (parsed?.code) {
-          prefix = parsed.code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-        }
-      }
-    } catch (e) {}
-
-    if (!prefix.endsWith('-') && !prefix.endsWith('/')) {
-      prefix = `${prefix}-`;
-    }
-
-    // Filter orders belonging to this branch
-    const branchOrders = orders.filter((o) => (o.shopId || 'shop-main') === currentShopId);
-    let maxNum = 0;
-    branchOrders.forEach((o) => {
-      if (o.orderNumber) {
-        const withoutYear = o.orderNumber.trim().replace(/\/\d+$/, '');
-        const match = withoutYear.match(/(\d+)$/);
-        if (match) {
-          const num = parseInt(match[1], 10);
-          if (!isNaN(num) && num > maxNum) {
-            maxNum = num;
-          }
-        }
-      }
-    });
-
-    const nextNum = maxNum > 0 ? maxNum + 1 : 1;
-    const currentYearSuffix = new Date().getFullYear().toString().slice(-2);
-    let orderNum = `${prefix}${String(nextNum).padStart(3, '0')}/${currentYearSuffix}`;
-
-    while (orders.some((o) => o.orderNumber === orderNum)) {
-      maxNum++;
-      orderNum = `${prefix}${String(maxNum + 1).padStart(3, '0')}/${currentYearSuffix}`;
-    }
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const orderNum = `ORD-${dateStr}-` + String(orders.length + 1).padStart(4, '0');
 
     const newOrd: Order = {
       _id: 'ord-' + Date.now(),
       orderNumber: orderNum,
-      shopId: currentShopId,
       customer: orderData.customerId || 'cust-1',
       customerSnapshot: {
         name: customerName,
@@ -1674,100 +1603,6 @@ export const fetchMachineUtilityAnalyticsApi = async (params: any = {}) => {
 };
 
 // ==========================================
-// MULTI-BRANCH & SHOP MANAGEMENT APIS
-// ==========================================
-export const fetchShops = async (params: { search?: string; region?: string; activeOnly?: boolean } = {}): Promise<{ success: boolean; shops: Shop[]; total: number }> => {
-  const cleanParams: any = {};
-  if (params.search) cleanParams.search = params.search;
-  if (params.region) cleanParams.region = params.region;
-  if (params.activeOnly) cleanParams.activeOnly = 'true';
-  const query = new URLSearchParams(cleanParams).toString();
-  return fetchApi(`/shops?${query}`);
-};
-
-export const fetchShopById = async (id: string): Promise<{ success: boolean; shop: Shop }> => {
-  return fetchApi(`/shops/${id}`);
-};
-
-export const createShopApi = async (shopData: Partial<Shop>): Promise<{ success: boolean; shop: Shop; message: string }> => {
-  clearApiCache();
-  return fetchApi('/shops', {
-    method: 'POST',
-    body: JSON.stringify(shopData),
-  });
-};
-
-export const updateShopApi = async (id: string, shopData: Partial<Shop>): Promise<{ success: boolean; shop: Shop; message: string }> => {
-  clearApiCache();
-  return fetchApi(`/shops/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(shopData),
-  });
-};
-
-export const deleteShopApi = async (id: string, hardDelete = true): Promise<{ success: boolean; message: string }> => {
-  clearApiCache();
-  return fetchApi(`/shops/${id}?hardDelete=${hardDelete}`, {
-    method: 'DELETE',
-  });
-};
-
-export const fetchShopOverviewApi = async (): Promise<{
-  success: boolean;
-  stats: {
-    totalShops: number;
-    activeShops: number;
-    totalRevenue: number;
-    totalOrders: number;
-    deliveredOrders: number;
-    todayRevenue: number;
-    todayOrders: number;
-    monthRevenue: number;
-    monthOrders: number;
-    totalCustomers: number;
-    totalStaff: number;
-  };
-  regionalBreakdown: Array<{ region: string; revenue: number; orders: number }>;
-}> => {
-  return fetchApi('/shops/overview');
-};
-
-// ==========================================
-// USER & ROLE MANAGEMENT APIS
-// ==========================================
-export const fetchUsers = async (params: { role?: string; shopId?: string; search?: string } = {}): Promise<{ success: boolean; users: UserAccount[]; total: number }> => {
-  const cleanParams: any = {};
-  if (params.role) cleanParams.role = params.role;
-  if (params.shopId) cleanParams.shopId = params.shopId;
-  if (params.search) cleanParams.search = params.search;
-  const query = new URLSearchParams(cleanParams).toString();
-  return fetchApi(`/users?${query}`);
-};
-
-export const createUserApi = async (userData: any): Promise<{ success: boolean; user: UserAccount; message: string }> => {
-  clearApiCache();
-  return fetchApi('/users', {
-    method: 'POST',
-    body: JSON.stringify(userData),
-  });
-};
-
-export const updateUserApi = async (id: string, userData: any): Promise<{ success: boolean; user: UserAccount; message: string }> => {
-  clearApiCache();
-  return fetchApi(`/users/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(userData),
-  });
-};
-
-export const deleteUserApi = async (id: string): Promise<{ success: boolean; message: string }> => {
-  clearApiCache();
-  return fetchApi(`/users/${id}`, {
-    method: 'DELETE',
-  });
-};
-
-// ==========================================
 // BACKGROUND DATA PRE-WARMING ENGINE
 // ==========================================
 let isPrewarmingDone = false;
@@ -1790,4 +1625,3 @@ export const prefetchAllAppData = async () => {
     console.error('Background pre-warming error:', err);
   }
 };
-
